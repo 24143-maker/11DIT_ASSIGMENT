@@ -11,7 +11,14 @@ config_version=5
 [application]
 
 config/name="11DIT_ASESSMENT"
+run/main_scene="uid://do1pjcvnfwqj"
 config/features=PackedStringArray("4.6", "GL Compatibility")
+
+[display]
+
+window/size/viewport_width=640
+window/size/viewport_height=360
+window/stretch/mode="viewport"
 
 [input]
 
@@ -82,6 +89,7 @@ pause={
 
 [rendering]
 
+textures/canvas_textures/default_texture_filter=0
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
