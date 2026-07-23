@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://b743blvwst0tc"]
+
+[ext_resource type="Script" uid="uid://cbdnwl60k2s54" path="res://scripts/match.gd" id="1_klj7n"]
+[ext_resource type="PackedScene" uid="uid://do1pjcvnfwqj" path="res://scenes/entities/player.tscn" id="1_yqfj7"]
+
+[node name="Match" type="Node2D" unique_id=661084551]
+script = ExtResource("1_klj7n")
+
+[node name="ColorRect" type="ColorRect" parent="." unique_id=858705389]
+offset_right = 896.0
+offset_bottom = 544.0
+color = Color(0.24705882, 0.60784316, 0.043137256, 1)
+
+[node name="FieldLines" type="Node2D" parent="." unique_id=36688010]
+
+[node name="ColorRect" type="ColorRect" parent="FieldLines" unique_id=1318465744]
+offset_right = 2.0
+offset_bottom = 40.0
+rotation = 0.00046614
+
+[node name="Player" parent="." unique_id=886370576 instance=ExtResource("1_yqfj7")]
