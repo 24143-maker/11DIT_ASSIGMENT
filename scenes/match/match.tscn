@@ -1,21 +1,157 @@
 [gd_scene format=3 uid="uid://b743blvwst0tc"]
 
-[ext_resource type="Script" uid="uid://cbdnwl60k2s54" path="res://scripts/match.gd" id="1_klj7n"]
+[ext_resource type="Script" uid="uid://b8bsyh75scsip" path="res://scripts/match.gd" id="1_klj7n"]
 [ext_resource type="PackedScene" uid="uid://do1pjcvnfwqj" path="res://scenes/entities/player.tscn" id="1_yqfj7"]
+[ext_resource type="PackedScene" uid="uid://b3nwy8eq4sgel" path="res://scenes/entities/teammate.tscn" id="3_h1ndw"]
 
-[node name="Match" type="Node2D" unique_id=661084551]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_nudob"]
+size = Vector2(896, 16)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_klj7n"]
+size = Vector2(16, 544)
+
+[node name="Match" type="Node2D" unique_id=661084551 groups=["attackers"]]
 script = ExtResource("1_klj7n")
 
-[node name="ColorRect" type="ColorRect" parent="." unique_id=858705389]
+[node name="grass" type="ColorRect" parent="." unique_id=858705389]
 offset_right = 896.0
 offset_bottom = 544.0
 color = Color(0.24705882, 0.60784316, 0.043137256, 1)
 
 [node name="FieldLines" type="Node2D" parent="." unique_id=36688010]
 
-[node name="ColorRect" type="ColorRect" parent="FieldLines" unique_id=1318465744]
-offset_right = 2.0
-offset_bottom = 40.0
+[node name="left_tryline" type="ColorRect" parent="FieldLines" unique_id=1568505781]
+offset_left = 48.0
+offset_right = 50.0
+offset_bottom = 544.0
 rotation = 0.00046614
 
-[node name="Player" parent="." unique_id=886370576 instance=ExtResource("1_yqfj7")]
+[node name="right_tryline" type="ColorRect" parent="FieldLines" unique_id=94120219]
+offset_left = 848.0
+offset_right = 850.0
+offset_bottom = 544.0
+rotation = 0.00046614
+
+[node name="halfway" type="ColorRect" parent="FieldLines" unique_id=1379277069]
+offset_left = 448.0
+offset_right = 450.0
+offset_bottom = 544.0
+rotation = 0.00046614
+
+[node name="top_sideline" type="ColorRect" parent="FieldLines" unique_id=1991193441]
+offset_left = 896.0
+offset_top = 3.916025e-05
+offset_right = 898.0
+offset_bottom = 896.00006
+rotation = 1.5707964
+
+[node name="bottom_sideline" type="ColorRect" parent="FieldLines" unique_id=70741919]
+offset_left = 896.0
+offset_top = 542.0
+offset_right = 898.0
+offset_bottom = 1438.0
+rotation = 1.5707964
+
+[node name="left_dead_ball_line" type="ColorRect" parent="FieldLines" unique_id=1799851695]
+offset_right = 1.9999983
+offset_bottom = 544.0
+rotation = 0.00046614
+
+[node name="right_dead_ball_line" type="ColorRect" parent="FieldLines" unique_id=1873768467]
+offset_left = 896.0
+offset_right = 898.0
+offset_bottom = 544.0
+rotation = 0.00046614
+
+[node name="left_10" type="ColorRect" parent="FieldLines" unique_id=2042509486]
+offset_left = 128.00002
+offset_right = 130.00002
+offset_bottom = 544.0
+rotation = 0.00046614
+
+[node name="left_20" type="ColorRect" parent="FieldLines" unique_id=1606612445]
+offset_left = 208.00003
+offset_right = 210.00003
+offset_bottom = 544.0
+rotation = 0.00046614
+
+[node name="left_30" type="ColorRect" parent="FieldLines" unique_id=2004346264]
+offset_left = 288.0
+offset_right = 290.0
+offset_bottom = 544.0
+rotation = 0.00046614
+
+[node name="left_40" type="ColorRect" parent="FieldLines" unique_id=1837904270]
+offset_left = 368.0
+offset_right = 370.0
+offset_bottom = 544.0
+rotation = 0.00046614
+
+[node name="right_40" type="ColorRect" parent="FieldLines" unique_id=160414088]
+offset_left = 528.0
+offset_right = 530.0
+offset_bottom = 544.0
+rotation = 0.00046614
+
+[node name="right_30" type="ColorRect" parent="FieldLines" unique_id=284673249]
+offset_left = 608.0
+offset_right = 610.0
+offset_bottom = 544.0
+rotation = 0.00046614
+
+[node name="right_20" type="ColorRect" parent="FieldLines" unique_id=887127462]
+offset_left = 688.0
+offset_right = 690.0
+offset_bottom = 544.0
+rotation = 0.00046614
+
+[node name="right_10" type="ColorRect" parent="FieldLines" unique_id=1183231984]
+offset_left = 767.99994
+offset_right = 769.99994
+offset_bottom = 544.0
+rotation = 0.00046614
+
+[node name="line_collisions" type="StaticBody2D" parent="." unique_id=284806744]
+position = Vector2(16, 0)
+
+[node name="top_line" type="CollisionShape2D" parent="line_collisions" unique_id=826770623]
+position = Vector2(432, -8)
+shape = SubResource("RectangleShape2D_nudob")
+
+[node name="bottom_line" type="CollisionShape2D" parent="line_collisions" unique_id=1490632271]
+position = Vector2(432, 552)
+shape = SubResource("RectangleShape2D_nudob")
+
+[node name="left_line" type="CollisionShape2D" parent="line_collisions" unique_id=1158513913]
+position = Vector2(-24, 272)
+shape = SubResource("RectangleShape2D_klj7n")
+
+[node name="right_line" type="CollisionShape2D" parent="line_collisions" unique_id=2007817416]
+position = Vector2(890, 272)
+shape = SubResource("RectangleShape2D_klj7n")
+
+[node name="Player" parent="." unique_id=886370576 groups=["attackers"] instance=ExtResource("1_yqfj7")]
+position = Vector2(88, 214)
+
+[node name="Camera2D" type="Camera2D" parent="Player" unique_id=1388044688]
+limit_left = 0
+limit_top = 0
+limit_right = 898
+limit_bottom = 544
+position_smoothing_enabled = true
+
+[node name="Teammate" parent="." unique_id=153971183 groups=["attackers"] instance=ExtResource("3_h1ndw")]
+position = Vector2(18, 143)
+support_offset = Vector2(-40, -80)
+
+[node name="Teammate2" parent="." unique_id=153227991 groups=["attackers"] instance=ExtResource("3_h1ndw")]
+position = Vector2(50, 175)
+support_offset = Vector2(-30, -35)
+
+[node name="Teammate3" parent="." unique_id=712178117 groups=["attackers"] instance=ExtResource("3_h1ndw")]
+position = Vector2(55, 271)
+support_offset = Vector2(-30, 35)
+
+[node name="Teammate4" parent="." unique_id=1475885666 groups=["attackers"] instance=ExtResource("3_h1ndw")]
+position = Vector2(38, 326)
+support_offset = Vector2(-40, 80)

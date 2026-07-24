@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="11DIT_ASESSMENT"
+config/name="11dit Assigment"
 run/main_scene="uid://b743blvwst0tc"
 config/features=PackedStringArray("4.6", "GL Compatibility")
 
