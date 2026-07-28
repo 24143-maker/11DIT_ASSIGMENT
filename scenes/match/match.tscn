@@ -157,5 +157,5 @@ support_offset = Vector2(-30, 35)
 position = Vector2(38, 326)
 support_offset = Vector2(-40, 80)
 
-[node name="Defender" parent="." unique_id=267604751 instance=ExtResource("4_nudob")]
+[node name="Defender" parent="." unique_id=267604751 groups=["defenders"] instance=ExtResource("4_nudob")]
 position = Vector2(367, 217)
