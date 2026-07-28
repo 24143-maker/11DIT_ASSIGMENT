@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://b8bsyh75scsip" path="res://scripts/match.gd" id="1_klj7n"]
 [ext_resource type="PackedScene" uid="uid://do1pjcvnfwqj" path="res://scenes/entities/player.tscn" id="1_yqfj7"]
 [ext_resource type="PackedScene" uid="uid://b3nwy8eq4sgel" path="res://scenes/entities/teammate.tscn" id="3_h1ndw"]
+[ext_resource type="PackedScene" uid="uid://clrdmhne2c0f3" path="res://scenes/entities/defender.tscn" id="4_nudob"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_nudob"]
 size = Vector2(896, 16)
@@ -10,7 +11,7 @@ size = Vector2(896, 16)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_klj7n"]
 size = Vector2(16, 544)
 
-[node name="Match" type="Node2D" unique_id=661084551 groups=["attackers"]]
+[node name="Match" type="Node2D" unique_id=661084551]
 script = ExtResource("1_klj7n")
 
 [node name="grass" type="ColorRect" parent="." unique_id=858705389]
@@ -155,3 +156,6 @@ support_offset = Vector2(-30, 35)
 [node name="Teammate4" parent="." unique_id=1475885666 groups=["attackers"] instance=ExtResource("3_h1ndw")]
 position = Vector2(38, 326)
 support_offset = Vector2(-40, 80)
+
+[node name="Defender" parent="." unique_id=267604751 instance=ExtResource("4_nudob")]
+position = Vector2(367, 217)
