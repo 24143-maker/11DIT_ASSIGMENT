@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://18b0mg85u1je"]
+
+[ext_resource type="Script" uid="uid://urb070ynksfr" path="res://scripts/ball.gd" id="1_1pamd"]
+[ext_resource type="Texture2D" uid="uid://cijptr2xqew7n" path="res://rugby_ball.png" id="2_rlpj1"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_wha2l"]
+radius = 50.0
+height = 156.08672
+
+[node name="Ball" type="Node2D" unique_id=191674890]
+
+[node name="ball" type="Area2D" parent="." unique_id=1081805475]
+script = ExtResource("1_1pamd")
+
+[node name="Sprite2D" type="Sprite2D" parent="ball" unique_id=323852301]
+rotation = 0.6981317
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_rlpj1")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="ball" unique_id=557488988]
+rotation = 1.5707964
+shape = SubResource("CapsuleShape2D_wha2l")
