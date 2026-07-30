@@ -17,6 +17,12 @@ rotation = 0.6981317
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_rlpj1")
 
+[node name="Shadow" type="Sprite2D" parent="Ball" unique_id=1287316994]
+modulate = Color(0, 0, 0, 0.39215687)
+rotation = 0.7853982
+scale = Vector2(0.1, 0.1)
+texture = ExtResource("2_rlpj1")
+
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Ball" unique_id=557488988]
 rotation = 1.5707964
 shape = SubResource("CapsuleShape2D_wha2l")
