@@ -3,9 +3,14 @@ class_name Player
 
 @export var base_speed: float = 110.0
 @export var sprint_multiplier: float = 1.4
-@export var is_user_controlled: bool = true 
+@export var is_user_controlled: bool = true
 
-var facing: Vector2 = Vector2.RIGHT 
+var facing: Vector2 = Vector2.RIGHT
+
+const PASS_TOLERANCE: float = 4.0
+
+func _ready() -> void:
+	add_to_group("attackers")
 
 func _physics_process(_delta: float) -> void:
 	if not is_user_controlled:
@@ -13,20 +18,18 @@ func _physics_process(_delta: float) -> void:
 
 	var input_dir: Vector2 = Input.get_vector(
 		"move_left", "move_right", "move_up", "move_down"
-		) 
-		
+	)
+
 	var speed: float = base_speed
 	if Input.is_action_pressed("sprint"):
 		speed *= sprint_multiplier
-	
+
 	velocity = input_dir * speed
 	move_and_slide()
-	
+
 	if input_dir.length() > 0.1:
 		facing = input_dir.normalized()
-	
-	
-const PASS_TOLERANCE: float = 4.0
+
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not is_user_controlled:
@@ -36,11 +39,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("pass_right"):
 		_try_pass(1)
 
+
 func _try_pass(direction: int) -> void:
 	var target: Node2D = _find_receiver(direction)
 
 	if target == null:
-		return  # no one there — do nothing, play a small "nope" sound
+		print("no receiver on that side")
+		return
 
 	# THE FORWARD PASS RULE
 	if target.global_position.x > global_position.x + PASS_TOLERANCE:
@@ -48,9 +53,22 @@ func _try_pass(direction: int) -> void:
 		GameState.do_turnover()
 		return
 
-	var ball := get_tree().get_first_node_in_group("ball") as Ball
-	ball.pass_to(global_position, target.global_position, self)
-	# (In the full version, control transfers to `target` when they catch it)
+	var ball: Ball = null
+	for n in get_tree().get_nodes_in_group("ball"):
+		if n is Ball:
+			ball = n
+			break
+	if ball == null:
+		print("no ball found")
+		return
+
+	# Only the current carrier can pass
+	if ball.carrier != self:
+		print("I'm not carrying the ball")
+		return
+
+	print("passing to ", target.name)
+	ball.pass_to(global_position, target.global_position, self, target)
 
 
 func _find_receiver(direction: int) -> Node2D:
@@ -76,7 +94,3 @@ func _find_receiver(direction: int) -> Node2D:
 			best = mate
 
 	return best
-	
-
-	
-	
