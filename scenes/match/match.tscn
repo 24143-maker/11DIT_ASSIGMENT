@@ -4,6 +4,7 @@
 [ext_resource type="PackedScene" uid="uid://do1pjcvnfwqj" path="res://scenes/entities/player.tscn" id="1_yqfj7"]
 [ext_resource type="PackedScene" uid="uid://b3nwy8eq4sgel" path="res://scenes/entities/teammate.tscn" id="3_h1ndw"]
 [ext_resource type="PackedScene" uid="uid://clrdmhne2c0f3" path="res://scenes/entities/defender.tscn" id="4_nudob"]
+[ext_resource type="PackedScene" uid="uid://18b0mg85u1je" path="res://scenes/entities/ball.tscn" id="5_86swp"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_nudob"]
 size = Vector2(896, 16)
@@ -159,3 +160,8 @@ support_offset = Vector2(-40, 80)
 
 [node name="Defender" parent="." unique_id=267604751 groups=["defenders"] instance=ExtResource("4_nudob")]
 position = Vector2(367, 217)
+
+[node name="Ball" parent="." unique_id=191674890 groups=["ball"] instance=ExtResource("5_86swp")]
+position = Vector2(134.00002, 235.00002)
+rotation = 1.5707964
+scale = Vector2(0.2, 0.2)
