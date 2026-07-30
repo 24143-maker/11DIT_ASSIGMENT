@@ -3,28 +3,24 @@
 [ext_resource type="Script" uid="uid://urb070ynksfr" path="res://scripts/ball.gd" id="1_1pamd"]
 [ext_resource type="Texture2D" uid="uid://cijptr2xqew7n" path="res://rugby_ball.png" id="2_rlpj1"]
 
-[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_wha2l"]
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_1pamd"]
 radius = 50.0
 height = 156.08672
 
-[node name="Ball" type="Node2D" unique_id=191674890]
-
-[node name="Ball" type="Area2D" parent="." unique_id=1081805475]
+[node name="Ball" type="Area2D" unique_id=1512035547]
 script = ExtResource("1_1pamd")
 
-[node name="Sprite2D" type="Sprite2D" parent="Ball" unique_id=323852301]
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=56863870]
 rotation = 0.6981317
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_rlpj1")
 
-[node name="Shadow" type="Sprite2D" parent="Ball" unique_id=1287316994]
+[node name="Shadow" type="Sprite2D" parent="." unique_id=67524159]
 modulate = Color(0, 0, 0, 0.39215687)
 rotation = 0.7853982
 scale = Vector2(0.1, 0.1)
 texture = ExtResource("2_rlpj1")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Ball" unique_id=557488988]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=457996967]
 rotation = 1.5707964
-shape = SubResource("CapsuleShape2D_wha2l")
-
-[connection signal="body_entered" from="Ball" to="Ball" method="_on_body_entered"]
+shape = SubResource("CapsuleShape2D_1pamd")
