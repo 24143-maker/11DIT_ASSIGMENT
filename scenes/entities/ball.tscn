@@ -4,7 +4,7 @@
 [ext_resource type="Texture2D" uid="uid://cijptr2xqew7n" path="res://rugby_ball.png" id="2_rlpj1"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_1pamd"]
-radius = 5.0
+radius = 22.022715
 
 [node name="Ball" type="Area2D" unique_id=1334006581]
 collision_layer = 2
@@ -16,7 +16,7 @@ scale = Vector2(0.018, 0.012)
 texture = ExtResource("2_rlpj1")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=924111214]
-scale = Vector2(0.018, 0.018)
+scale = Vector2(0.1, 0.1)
 texture = ExtResource("2_rlpj1")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=879772881]
