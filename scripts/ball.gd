@@ -5,7 +5,7 @@ class_name Ball
 @onready var shadow: Sprite2D = $Shadow
 
 const GRAVITY: float = 900.0
-const CATCH_DISTANCE: float = 12.0   # how close the ball must get to be caught
+const CATCH_DISTANCE: float = 14.0
 
 var velocity_2d: Vector2 = Vector2.ZERO
 var height: float = 0.0
@@ -15,9 +15,8 @@ var friction: float = 0.0
 var in_flight: bool = false
 var kick_type: String = ""
 var passer: Node2D = null
-var target_receiver: Node2D = null   # who this pass is aimed at
+var target_receiver: Node2D = null
 
-# Who is currently holding the ball. When set, the ball follows them.
 var carrier: Node2D = null
 
 signal landed(pos: Vector2)
@@ -27,7 +26,7 @@ func _ready() -> void:
 	add_to_group("ball")
 
 func _physics_process(delta: float) -> void:
-	# If someone is carrying the ball, stick to them and do nothing else
+	# Follow the carrier when held
 	if carrier != null and not in_flight:
 		global_position = carrier.global_position
 		sprite.position.y = 0.0
@@ -36,26 +35,22 @@ func _physics_process(delta: float) -> void:
 	if not in_flight:
 		return
 
-	# Move across the ground
 	global_position += velocity_2d * delta
 	velocity_2d = velocity_2d.lerp(Vector2.ZERO, friction * delta)
 
-	# Fake vertical movement
 	height_speed -= GRAVITY * delta
 	height += height_speed * delta
 
-	# Draw the ball above its shadow
 	sprite.position.y = -height
-	shadow.scale = Vector2(0.018, 0.012) * clamp(1.0 - height / 300.0, 0.4, 1.0)
 
-	# --- PASS: check if it has reached the intended receiver ---
+	# PASS: resolve the moment it reaches the receiver (catch OR knock-on)
 	if kick_type == "pass" and target_receiver != null:
 		var d: float = global_position.distance_to(target_receiver.global_position)
 		if d < CATCH_DISTANCE:
 			_attempt_catch(target_receiver)
 			return
 
-	# --- Ground / bounce handling ---
+	# Ground / bounce
 	if height <= 0.0:
 		height = 0.0
 		if bounciness > 0.05 and abs(height_speed) > 40.0:
@@ -67,12 +62,16 @@ func _physics_process(delta: float) -> void:
 				in_flight = false
 			landed.emit(global_position)
 
-	# Safety net: stop the ball if it leaves the field
-	if global_position.x < 0 or global_position.x > 896 or global_position.y < 0 or global_position.y > 544:
+	# Safety net: a pass that somehow overshoots is a knock-on, not a lost ball
+	if global_position.x < 4 or global_position.x > 892 or global_position.y < 4 or global_position.y > 540:
 		in_flight = false
 		velocity_2d = Vector2.ZERO
 		height = 0.0
 		height_speed = 0.0
+		if kick_type == "pass":
+			print("pass went to ground — KNOCK ON")
+			carrier = null
+			GameState.do_turnover()
 
 
 func pass_to(from: Vector2, to: Vector2, thrower: Node2D, receiver: Node2D, speed: float = 200.0) -> void:
@@ -129,13 +128,12 @@ func _attempt_catch(catcher: Node2D) -> void:
 
 	var roll: int = randi_range(0, 40)
 
-	if hands + roll > 50:
+	if hands + roll > 40:
 		carrier = catcher
 		global_position = catcher.global_position
 		caught.emit(catcher)
 		print("CAUGHT by ", catcher.name)
 	else:
-		# Dropped it — knock-on, turnover
 		carrier = null
 		print("KNOCK ON!")
 		GameState.do_turnover()

@@ -1,10 +1,8 @@
 extends Node2D
 
-@onready var player: Player = $Player
-
 const RETREAT_METRES: float = 10.0
 
-var current_carrier: Node2D = null   # who holds the ball right now
+var current_carrier: Node2D = null
 
 func _ready() -> void:
 	GameState.tackle_made.connect(_on_tackle_made)
@@ -14,17 +12,24 @@ func _ready() -> void:
 	if ball:
 		ball.caught.connect(_on_ball_caught)
 
-	_assign_carrier(player)
-
-	# Give the ball to the player at kickoff
+	# Give the ball to the first attacker at kickoff
 	await get_tree().process_frame
-	_give_ball_to(player)
+	var first: Node2D = _pick_starting_carrier()
+	if first:
+		_give_ball_to(first)
 
 
 func _get_ball() -> Ball:
 	for n in get_tree().get_nodes_in_group("ball"):
 		if n is Ball:
 			return n
+	return null
+
+
+func _pick_starting_carrier() -> Node2D:
+	# Just grab the first attacker in the group
+	for a in get_tree().get_nodes_in_group("attackers"):
+		return a
 	return null
 
 
@@ -37,22 +42,18 @@ func _give_ball_to(who: Node2D) -> void:
 	ball.global_position = who.global_position
 	current_carrier = who
 
-	# Make sure the human controls the carrier and no one else
 	_set_control(who)
 	_assign_carrier(who)
 
 
 func _set_control(who: Node2D) -> void:
-	# Turn off control on everyone, then turn it on for the carrier
 	for a in get_tree().get_nodes_in_group("attackers"):
-		if "is_user_controlled" in a:
-			a.is_user_controlled = (a == who)
+		a.is_user_controlled = (a == who)
 
 
 func _assign_carrier(who: Node2D) -> void:
-	for mate in get_tree().get_nodes_in_group("attackers"):
-		if mate is Teammate:
-			mate.ball_carrier = who
+	for a in get_tree().get_nodes_in_group("attackers"):
+		a.ball_carrier = who
 	for d in get_tree().get_nodes_in_group("defenders"):
 		d.ball_carrier = who
 
@@ -64,7 +65,7 @@ func _on_tackle_made(tackle_number: int) -> void:
 func _play_the_ball(tackle_number: int) -> void:
 	print("TACKLE ", tackle_number)
 
-	if current_carrier and "is_user_controlled" in current_carrier:
+	if current_carrier:
 		current_carrier.is_user_controlled = false
 		current_carrier.velocity = Vector2.ZERO
 
@@ -76,7 +77,7 @@ func _play_the_ball(tackle_number: int) -> void:
 
 	await get_tree().create_timer(0.8).timeout
 
-	if current_carrier and "is_user_controlled" in current_carrier:
+	if current_carrier:
 		current_carrier.is_user_controlled = true
 	GameState.play_active = true
 
@@ -85,7 +86,7 @@ func _on_turnover() -> void:
 	print("HANDOVER!")
 	if current_carrier:
 		current_carrier.global_position = Vector2(448, 272)
-	_give_ball_to(player)
+		_give_ball_to(current_carrier)
 	GameState.play_active = true
 
 	for d in get_tree().get_nodes_in_group("defenders"):
@@ -94,7 +95,6 @@ func _on_turnover() -> void:
 
 
 func _on_ball_caught(new_carrier: Node2D) -> void:
-	# The catcher becomes the controlled carrier
 	current_carrier = new_carrier
 	_set_control(new_carrier)
 	_assign_carrier(new_carrier)
