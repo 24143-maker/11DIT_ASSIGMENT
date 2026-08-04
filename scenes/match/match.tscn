@@ -1,7 +1,6 @@
 [gd_scene format=3 uid="uid://b743blvwst0tc"]
 
 [ext_resource type="Script" uid="uid://b8bsyh75scsip" path="res://scripts/match.gd" id="1_klj7n"]
-[ext_resource type="PackedScene" uid="uid://do1pjcvnfwqj" path="res://scenes/entities/player.tscn" id="1_yqfj7"]
 [ext_resource type="PackedScene" uid="uid://b3nwy8eq4sgel" path="res://scenes/entities/footballer.tscn" id="3_h1ndw"]
 [ext_resource type="PackedScene" uid="uid://clrdmhne2c0f3" path="res://scenes/entities/defender.tscn" id="4_nudob"]
 [ext_resource type="PackedScene" uid="uid://18b0mg85u1je" path="res://scenes/entities/ball.tscn" id="5_86swp"]
@@ -132,10 +131,11 @@ shape = SubResource("RectangleShape2D_klj7n")
 position = Vector2(890, 272)
 shape = SubResource("RectangleShape2D_klj7n")
 
-[node name="Player" parent="." unique_id=886370576 groups=["attackers"] instance=ExtResource("1_yqfj7")]
-position = Vector2(88, 214)
+[node name="Footballer" parent="." unique_id=886370576 instance=ExtResource("3_h1ndw")]
+position = Vector2(114, 235)
+support_offset = Vector2(-40, 0)
 
-[node name="Camera2D" type="Camera2D" parent="Player" unique_id=1388044688]
+[node name="Camera2D" type="Camera2D" parent="Footballer" unique_id=1388044688]
 zoom = Vector2(0.65, 0.65)
 limit_left = 0
 limit_top = 0
@@ -143,21 +143,21 @@ limit_right = 898
 limit_bottom = 544
 position_smoothing_enabled = true
 
-[node name="Teammate" parent="." unique_id=153971183 groups=["attackers"] instance=ExtResource("3_h1ndw")]
-position = Vector2(18, 143)
+[node name="Footballer2" parent="." unique_id=102084955 instance=ExtResource("3_h1ndw")]
+position = Vector2(62, 303)
+support_offset = Vector2(-40, 80)
+
+[node name="Footballer3" parent="." unique_id=1510273732 instance=ExtResource("3_h1ndw")]
+position = Vector2(60, 141)
 support_offset = Vector2(-40, -80)
 
-[node name="Teammate2" parent="." unique_id=153227991 groups=["attackers"] instance=ExtResource("3_h1ndw")]
-position = Vector2(50, 175)
-support_offset = Vector2(-30, -35)
-
-[node name="Teammate3" parent="." unique_id=712178117 groups=["attackers"] instance=ExtResource("3_h1ndw")]
-position = Vector2(55, 271)
+[node name="Footballer4" parent="." unique_id=742142067 instance=ExtResource("3_h1ndw")]
+position = Vector2(82, 261)
 support_offset = Vector2(-30, 35)
 
-[node name="Teammate4" parent="." unique_id=1475885666 groups=["attackers"] instance=ExtResource("3_h1ndw")]
-position = Vector2(38, 326)
-support_offset = Vector2(-40, 80)
+[node name="Footballer5" parent="." unique_id=2004962205 instance=ExtResource("3_h1ndw")]
+position = Vector2(88, 195)
+support_offset = Vector2(-30, -35)
 
 [node name="Defender" parent="." unique_id=267604751 groups=["defenders"] instance=ExtResource("4_nudob")]
 position = Vector2(367, 217)
