@@ -1,10 +1,13 @@
 extends CharacterBody2D
-class_name Teammate
+class_name Footballer
 
-@export var base_speed: float = 105.0
+@export var base_speed: float = 110.0
+@export var sprint_multiplier: float = 1.4
 @export var support_offset: Vector2 = Vector2(-40, -60)
-@export var is_user_controlled: bool = false
 
+# Set true on whichever footballer the human is currently controlling
+var is_user_controlled: bool = false
+# Who is carrying the ball right now (could be me)
 var ball_carrier: Node2D = null
 var facing: Vector2 = Vector2.RIGHT
 
@@ -19,22 +22,23 @@ func _physics_process(_delta: float) -> void:
 	else:
 		_do_support()
 
-# When this teammate has caught the ball, the human controls them
+
 func _do_user_control() -> void:
 	var input_dir: Vector2 = Input.get_vector(
 		"move_left", "move_right", "move_up", "move_down"
 	)
 	var speed: float = base_speed
 	if Input.is_action_pressed("sprint"):
-		speed *= 1.4
+		speed *= sprint_multiplier
 	velocity = input_dir * speed
 	move_and_slide()
 	if input_dir.length() > 0.1:
 		facing = input_dir.normalized()
 
-# When not carrying, run in a support shape behind the carrier
+
 func _do_support() -> void:
-	if ball_carrier == null:
+	# If no one is carrying, or I'm the carrier but not controlled, just hold still
+	if ball_carrier == null or ball_carrier == self:
 		velocity = Vector2.ZERO
 		return
 
@@ -65,19 +69,17 @@ func _try_pass(direction: int) -> void:
 		print("no receiver on that side")
 		return
 
+	# THE FORWARD PASS RULE
 	if target.global_position.x > global_position.x + PASS_TOLERANCE:
 		print("FORWARD PASS!")
 		GameState.do_turnover()
 		return
 
-	var ball: Ball = null
-	for n in get_tree().get_nodes_in_group("ball"):
-		if n is Ball:
-			ball = n
-			break
+	var ball: Ball = _get_ball()
 	if ball == null:
 		return
 	if ball.carrier != self:
+		print("I'm not carrying the ball")
 		return
 
 	print("passing to ", target.name)
@@ -100,3 +102,10 @@ func _find_receiver(direction: int) -> Node2D:
 			best_dist = d
 			best = mate
 	return best
+
+
+func _get_ball() -> Ball:
+	for n in get_tree().get_nodes_in_group("ball"):
+		if n is Ball:
+			return n
+	return null

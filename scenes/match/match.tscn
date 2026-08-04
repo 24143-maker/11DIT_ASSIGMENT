@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://b8bsyh75scsip" path="res://scripts/match.gd" id="1_klj7n"]
 [ext_resource type="PackedScene" uid="uid://do1pjcvnfwqj" path="res://scenes/entities/player.tscn" id="1_yqfj7"]
-[ext_resource type="PackedScene" uid="uid://b3nwy8eq4sgel" path="res://scenes/entities/teammate.tscn" id="3_h1ndw"]
+[ext_resource type="PackedScene" uid="uid://b3nwy8eq4sgel" path="res://scenes/entities/footballer.tscn" id="3_h1ndw"]
 [ext_resource type="PackedScene" uid="uid://clrdmhne2c0f3" path="res://scenes/entities/defender.tscn" id="4_nudob"]
 [ext_resource type="PackedScene" uid="uid://18b0mg85u1je" path="res://scenes/entities/ball.tscn" id="5_86swp"]
 
