@@ -3,15 +3,24 @@ class_name Footballer
 
 @export var base_speed: float = 110.0
 @export var sprint_multiplier: float = 1.4
-@export var support_offset: Vector2 = Vector2(-40, -60)
 
-# Set true on whichever footballer the human is currently controlling
+# This footballer's slot in the attacking line, as an offset from the carrier.
+# x is how far BEHIND the carrier (negative), y is where across the field.
+@export var line_slot: Vector2 = Vector2(-30, 0)
+
 var is_user_controlled: bool = false
-# Who is carrying the ball right now (could be me)
 var ball_carrier: Node2D = null
 var facing: Vector2 = Vector2.RIGHT
 
 const PASS_TOLERANCE: float = 4.0
+
+# --- Kicking ---
+var kick_charge: float = 0.0
+var is_charging: bool = false
+var selected_kick: String = "grubber"
+const CHARGE_RATE: float = 0.85
+
+signal kick_state_changed(charging: bool, charge: float, kick_type: String)
 
 func _ready() -> void:
 	add_to_group("attackers")
@@ -37,14 +46,17 @@ func _do_user_control() -> void:
 
 
 func _do_support() -> void:
-	# If no one is carrying, or I'm the carrier but not controlled, just hold still
 	if ball_carrier == null or ball_carrier == self:
 		velocity = Vector2.ZERO
 		return
 
-	var target: Vector2 = ball_carrier.global_position + support_offset
+	# Hold my slot: behind the carrier on x, at my own line position on y
+	var target: Vector2 = Vector2(
+		ball_carrier.global_position.x + line_slot.x,
+		line_slot.y
+	)
 	target.x = clamp(target.x, Field.FIELD_LEFT, Field.FIELD_RIGHT)
-	target.y = clamp(target.y, 16.0, Field.FIELD_BOTTOM - 16.0)
+	target.y = clamp(target.y, 24.0, Field.FIELD_BOTTOM - 24.0)
 
 	var to_target: Vector2 = target - global_position
 	if to_target.length() > 6.0:
@@ -52,6 +64,49 @@ func _do_support() -> void:
 	else:
 		velocity = Vector2.ZERO
 	move_and_slide()
+
+
+func _process(delta: float) -> void:
+	if not is_user_controlled:
+		return
+
+	var ball: Ball = _get_ball()
+	if ball == null or ball.carrier != self:
+		if is_charging:
+			is_charging = false
+			kick_state_changed.emit(false, 0.0, selected_kick)
+		return
+
+	if Input.is_action_just_pressed("kick"):
+		is_charging = true
+		kick_charge = 0.0
+
+	if is_charging:
+		kick_charge = min(kick_charge + CHARGE_RATE * delta, 1.0)
+
+		if Input.is_action_just_pressed("kick_grubber"):
+			selected_kick = "grubber"
+		if Input.is_action_just_pressed("kick_bomb"):
+			selected_kick = "bomb"
+		if Input.is_action_just_pressed("kick_long"):
+			selected_kick = "long"
+
+		kick_state_changed.emit(true, kick_charge, selected_kick)
+
+	if Input.is_action_just_released("kick") and is_charging:
+		_do_kick()
+		is_charging = false
+		kick_state_changed.emit(false, 0.0, selected_kick)
+
+
+func _do_kick() -> void:
+	var ball: Ball = _get_ball()
+	if ball == null or ball.carrier != self:
+		return
+	var power: float = lerp(0.3, 1.0, kick_charge)
+	print("KICK: ", selected_kick, " power ", round(power * 100), "%")
+	ball.kick(global_position, facing, power, selected_kick)
+	kick_charge = 0.0
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -69,7 +124,6 @@ func _try_pass(direction: int) -> void:
 		print("no receiver on that side")
 		return
 
-	# THE FORWARD PASS RULE
 	if target.global_position.x > global_position.x + PASS_TOLERANCE:
 		print("FORWARD PASS!")
 		GameState.do_turnover()
@@ -79,16 +133,18 @@ func _try_pass(direction: int) -> void:
 	if ball == null:
 		return
 	if ball.carrier != self:
-		print("I'm not carrying the ball")
 		return
 
+	# LEAD THE PASS: aim where the receiver will be, based on their velocity
+	var lead_time: float = 0.35
+	var predicted: Vector2 = target.global_position + target.velocity * lead_time
 	print("passing to ", target.name)
-	ball.pass_to(global_position, target.global_position, self, target)
+	ball.pass_to(global_position, predicted, self, target)
 
 
 func _find_receiver(direction: int) -> Node2D:
 	var best: Node2D = null
-	var best_dist: float = 200.0
+	var best_dist: float = 250.0
 	for mate in get_tree().get_nodes_in_group("attackers"):
 		if mate == self:
 			continue
