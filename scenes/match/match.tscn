@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" uid="uid://b8bsyh75scsip" path="res://scripts/match.gd" id="1_klj7n"]
 [ext_resource type="PackedScene" uid="uid://b3nwy8eq4sgel" path="res://scenes/entities/footballer.tscn" id="3_h1ndw"]
-[ext_resource type="PackedScene" uid="uid://clrdmhne2c0f3" path="res://scenes/entities/defender.tscn" id="4_nudob"]
 [ext_resource type="PackedScene" uid="uid://18b0mg85u1je" path="res://scenes/entities/ball.tscn" id="5_86swp"]
 [ext_resource type="Script" uid="uid://ba5u347a7p6hy" path="res://scripts/hud.gd" id="5_o7pxg"]
 
@@ -134,7 +133,7 @@ shape = SubResource("RectangleShape2D_klj7n")
 
 [node name="Footballer" parent="." unique_id=886370576 groups=["attackers"] instance=ExtResource("3_h1ndw")]
 position = Vector2(114, 235)
-line_slot = Vector2(-20, 140)
+line_slot = Vector2(0, 140)
 
 [node name="Camera2D" type="Camera2D" parent="Footballer" unique_id=1388044688]
 zoom = Vector2(0.65, 0.65)
@@ -159,9 +158,6 @@ line_slot = Vector2(-40, 410)
 [node name="Footballer5" parent="." unique_id=2004962205 groups=["attackers"] instance=ExtResource("3_h1ndw")]
 position = Vector2(88, 195)
 line_slot = Vector2(-40, 500)
-
-[node name="Defender" parent="." unique_id=267604751 groups=["defenders"] instance=ExtResource("4_nudob")]
-position = Vector2(367, 217)
 
 [node name="Ball" parent="." unique_id=191674890 groups=["ball"] instance=ExtResource("5_86swp")]
 position = Vector2(134.00002, 235.00002)
