@@ -19,6 +19,7 @@ var kickoff_in_progress: bool = false
 var scoring: bool = false
 var kickoff_chase: bool = false
 var kickoff_landing: Vector2 = Vector2.ZERO
+var kickoff_receiver: Node2D = null    # locked once, never reassigned
 var kick_chaser: Node2D = null          # the one player committed to chasing a kick
 var kick_control_delay: float = 0.0     # counts down before control switches to them
 
@@ -118,6 +119,7 @@ func _kickoff() -> void:
 	GameState.reset_set()
 	kickoff_in_progress = true
 	kickoff_chase = false
+	kickoff_receiver = null
 	kick_chaser = null
 	kick_control_delay = 0.0
 	current_carrier = null
@@ -186,6 +188,18 @@ func _kickoff() -> void:
 	var power: float = clamp(to_target.length() / 420.0, 0.55, 1.0)
 	ball.kick(kicker.global_position, dir, power, "long")
 
+	# LOCK the receiver now, based on where the ball is actually going.
+	# Never reassign — swapping mid-flight is what caused the jitter.
+	kickoff_receiver = _closest_in_group_to("attackers", kickoff_landing)
+	if kickoff_receiver:
+		for a in get_tree().get_nodes_in_group("attackers"):
+			a.is_chasing_ball = false
+			a.is_user_controlled = false
+			if a != kickoff_receiver:
+				a.advance_to_x = kickoff_landing.x - 60.0
+		kickoff_receiver.is_chasing_ball = true
+		kickoff_receiver.chase_ball_pos = kickoff_landing
+
 	kickoff_chase = true
 	kicker.state = Defender.State.RETREAT
 
@@ -227,6 +241,10 @@ func _give_ball_to(who: Footballer) -> void:
 
 
 func _set_control(who: Node2D) -> void:
+	# While a kick-off is in flight, only the locked receiver may ever be given
+	# control. This stops any other system reassigning it mid-flight.
+	if kickoff_in_progress and kickoff_receiver != null and who != kickoff_receiver:
+		return
 	for a in get_tree().get_nodes_in_group("attackers"):
 		a.is_user_controlled = (a == who)
 
@@ -314,13 +332,17 @@ func _kickoff_chase_step() -> void:
 		_stop_attacker_chase()
 		kickoff_chase = false
 		return
+	# Keep chasing whether the ball is still flying or already rolling
 	if not ball.in_flight and not ball.is_loose:
 		_stop_attacker_chase()
 		kickoff_chase = false
 		return
 
-	# Nobody is driven by the human during the kick-off — the AI collects it
-	_attackers_chase(ball, 2, false)
+	# Only the locked receiver chases, and we just refresh their target.
+	# No re-sorting, so control and roles cannot flicker.
+	if kickoff_receiver and is_instance_valid(kickoff_receiver):
+		kickoff_receiver.is_chasing_ball = true
+		kickoff_receiver.chase_ball_pos = ball.global_position
 
 
 # The nearest N attackers go for the ball. They move themselves in their own
@@ -356,6 +378,7 @@ func _attackers_chase(ball: Ball, how_many: int, give_control: bool = true) -> v
 
 
 func _stop_attacker_chase() -> void:
+	kickoff_receiver = null
 	for a in get_tree().get_nodes_in_group("attackers"):
 		a.is_chasing_ball = false
 		a.advance_to_x = -1.0
@@ -400,6 +423,9 @@ func _on_ball_kicked(from_pos: Vector2) -> void:
 # ---------- LOOSE BALL ----------
 
 func _on_ball_became_loose(_pos: Vector2) -> void:
+	# During a kick-off the receiver is already locked in — leave it alone
+	if kickoff_in_progress:
+		return
 	chasing_loose = true
 	GameState.phase = GameState.Phase.OPEN_PLAY
 	for a in get_tree().get_nodes_in_group("attackers"):
@@ -416,6 +442,8 @@ func _on_ball_became_loose(_pos: Vector2) -> void:
 
 
 func _steer_defender_to_loose_ball() -> void:
+	if kickoff_in_progress:
+		return
 	var ball: Ball = get_ball()
 	if ball == null or ball.carrier != null:
 		_stop_attacker_chase()
