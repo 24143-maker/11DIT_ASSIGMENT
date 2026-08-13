@@ -11,10 +11,18 @@ enum Phase { OPEN_PLAY, RUCK, DEAD }
 
 const TACKLES_PER_SET: int = 6
 
+const GAME_TITLE: String = "RUGBY RIVALRY"
+const HOME_NAME: String = "Hauraki Plains College"
+const HOME_SHORT: String = "HPC"
+const AWAY_NAME: String = "Pukekohe High School"
+const AWAY_SHORT: String = "PHS"
+
 var tackle_count: int = 0
 var possession: int = 0          # 0 = player's team
 var score: Array[int] = [0, 0]
 var phase: Phase = Phase.OPEN_PLAY
+var tackle_position: Vector2 = Vector2.ZERO   # where the ball is played from
+var tackled_player: Node2D = null             # who actually got tackled
 
 # Convenience: can defenders tackle right now?
 func can_tackle() -> bool:

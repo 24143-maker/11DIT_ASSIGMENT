@@ -10,6 +10,9 @@ var kick_bg: ColorRect
 var kick_label: Label
 
 var _event_timer: float = 0.0
+var stam_bg: ColorRect
+var stam_bar: ColorRect
+var name_label: Label
 
 
 func _ready() -> void:
@@ -36,6 +39,22 @@ func _ready() -> void:
 
 	kick_label = _make_label(Vector2(220, 296), 16)
 
+	# Carrier's name, sitting just above the stamina bar
+	name_label = _make_label(Vector2(16, 310), 16)
+
+	# Stamina bar, bottom-left
+	stam_bg = ColorRect.new()
+	stam_bg.position = Vector2(16, 330)
+	stam_bg.size = Vector2(120, 12)
+	stam_bg.color = Color(0, 0, 0, 0.55)
+	add_child(stam_bg)
+
+	stam_bar = ColorRect.new()
+	stam_bar.position = Vector2(18, 332)
+	stam_bar.size = Vector2(116, 8)
+	stam_bar.color = Color(0.35, 0.85, 0.4, 0.95)
+	add_child(stam_bar)
+
 	_set_kick_visible(false)
 	_refresh()
 
@@ -57,10 +76,44 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_update_stamina()
+
 	if _event_timer > 0.0:
 		_event_timer -= delta
 		if _event_timer <= 0.0:
 			event_label.visible = false
+
+
+func _update_stamina() -> void:
+	if stam_bar == null:
+		return
+
+	for a in get_tree().get_nodes_in_group("attackers"):
+		if a.is_user_controlled:
+			# Name above the bar
+			if name_label:
+				name_label.text = a.player_name
+				name_label.visible = true
+
+			var pct: float = clamp(a.stamina / a.stamina_max, 0.0, 1.0)
+			stam_bar.size.x = 116.0 * pct
+			stam_bg.visible = true
+			stam_bar.visible = true
+
+			# Green when fresh, amber when low, red when spent
+			if pct > 0.5:
+				stam_bar.color = Color(0.35, 0.85, 0.4, 0.95)
+			elif pct > 0.2:
+				stam_bar.color = Color(0.95, 0.75, 0.25, 0.95)
+			else:
+				stam_bar.color = Color(0.9, 0.3, 0.25, 0.95)
+			return
+
+	# Nobody controlled (e.g. during a kick-off) — hide the panel
+	if name_label:
+		name_label.visible = false
+	stam_bg.visible = false
+	stam_bar.visible = false
 
 
 func _make_label(pos: Vector2, size: int) -> Label:
@@ -75,7 +128,7 @@ func _make_label(pos: Vector2, size: int) -> Label:
 
 
 func _refresh() -> void:
-	score_label.text = "HOME %d   AWAY %d" % [GameState.score[0], GameState.score[1]]
+	score_label.text = "%s %d   %s %d" % [GameState.HOME_SHORT, GameState.score[0], GameState.AWAY_SHORT, GameState.score[1]]
 	var dots := ""
 	for i in range(GameState.TACKLES_PER_SET):
 		dots += "O" if i < GameState.tackle_count else "-"
