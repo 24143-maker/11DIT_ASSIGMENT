@@ -4,20 +4,23 @@
 [ext_resource type="Texture2D" uid="uid://cijptr2xqew7n" path="res://rugby_ball.png" id="2_rlpj1"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_1pamd"]
-radius = 26.172504
+radius = 32.0
 
 [node name="Ball" type="Area2D" unique_id=1334006581]
 collision_layer = 2
 script = ExtResource("1_1pamd")
 
-[node name="Shadow" type="Sprite2D" parent="." unique_id=1525296583]
+[node name="Shadow" type="Sprite2D" parent="." unique_id=731442518]
 modulate = Color(0, 0, 0, 0.39215687)
-scale = Vector2(0.018, 0.012)
+position = Vector2(-0.24095023, 0.19784689)
+rotation = 0.7853982
+scale = Vector2(0.111191794, 0.11343013)
 texture = ExtResource("2_rlpj1")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=924111214]
+position = Vector2(-0.24095023, 0.19784689)
 rotation = 0.7853982
-scale = Vector2(0.1, 0.1)
+scale = Vector2(0.111191794, 0.11343014)
 texture = ExtResource("2_rlpj1")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=879772881]
