@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://b743blvwst0tc"]
 
 [ext_resource type="Script" uid="uid://b8bsyh75scsip" path="res://scripts/match.gd" id="1_klj7n"]
-[ext_resource type="Texture2D" uid="uid://l2u1b2njitf5" path="res://field_rugby_rivalry.png" id="2_o7pxg"]
+[ext_resource type="Texture2D" uid="uid://ce2f1jd2hyhlo" path="res://field_rugby_rivalry1.png" id="2_o7pxg"]
 [ext_resource type="PackedScene" uid="uid://b3nwy8eq4sgel" path="res://scenes/entities/footballer.tscn" id="3_h1ndw"]
 [ext_resource type="Script" uid="uid://c14kbv47uhfmq" path="res://scripts/field_lines.gd" id="3_o7pxg"]
 [ext_resource type="PackedScene" uid="uid://18b0mg85u1je" path="res://scenes/entities/ball.tscn" id="5_86swp"]
@@ -26,11 +26,11 @@ script = ExtResource("3_o7pxg")
 [node name="line_collisions" type="StaticBody2D" parent="." unique_id=284806744]
 
 [node name="top_line" type="CollisionShape2D" parent="line_collisions" unique_id=826770623]
-position = Vector2(448, -8)
+position = Vector2(448, -6)
 shape = SubResource("RectangleShape2D_nudob")
 
 [node name="bottom_line" type="CollisionShape2D" parent="line_collisions" unique_id=1490632271]
-position = Vector2(448, 552)
+position = Vector2(448, 550)
 shape = SubResource("RectangleShape2D_nudob")
 debug_color = Color(2.887845e-06, 0.58914435, 0.76032543, 0.41960785)
 
