@@ -14,6 +14,8 @@ const LOOSE_FRICTION: float = 1.6
 const PASS_DURATION: float = 0.40   # every pass takes this long, whatever the distance
 const PASS_MAX_TIME: float = 1.20   # hard timeout: pass always resolves, never flies away
 const INTERCEPT_DISTANCE: float = 15.0   # a defender this close cuts the pass out
+const FIELD_CATCH_DIST: float = 22.0     # fullback fielding a kick out of the air
+const FIELD_CATCH_HEIGHT: float = 60.0   # he can take it up to this height
 
 var velocity_2d: Vector2 = Vector2.ZERO
 var height: float = 0.0
@@ -78,9 +80,12 @@ func _do_pass(delta: float) -> void:
 		return
 
 	# A defender in the passing lane knocks it down
-	var blocker: Node2D = _nearest_defender(INTERCEPT_DISTANCE)
+	var blocker: Node2D = null
+	if not GameState.player_defending():
+		blocker = _nearest_defender(INTERCEPT_DISTANCE)
 	if blocker != null:
 		print("INTERCEPTED by ", blocker.name)
+		GameState.turnover_position = global_position
 		velocity_2d = velocity_2d * 0.25
 		carrier = null
 		_go_loose()
@@ -161,6 +166,7 @@ func _go_loose() -> void:
 
 
 func _pick_up(who: Node2D) -> void:
+	GameState.turnover_position = global_position
 	is_loose = false
 	in_flight = false
 	velocity_2d = Vector2.ZERO
@@ -269,6 +275,21 @@ func kick(from: Vector2, direction: Vector2, power: float, type: String) -> void
 
 	print("KICK ", type, " power ", round(power * 100), "% dir ", direction)
 	kicked.emit(from)
+
+
+# Defender takes a kick cleanly — a fullback fielding a bomb or grubber
+func _field_kick(fielder: Node2D) -> void:
+	GameState.turnover_position = fielder.global_position
+	in_flight = false
+	is_loose = false
+	velocity_2d = Vector2.ZERO
+	height = 0.0
+	height_speed = 0.0
+	sprite.position.y = 0.0
+	carrier = fielder
+	global_position = fielder.global_position
+	print("FIELDED by ", fielder.name)
+	picked_up.emit(fielder)
 
 
 func _attempt_catch(catcher: Node2D) -> void:

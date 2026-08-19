@@ -8,6 +8,9 @@ class_name Footballer
 @export var hands_stat: int = 70
 @export var strength_stat: int = 50
 @export var line_slot: Vector2 = Vector2(-30, 272)
+@export var def_slot_y: float = 272.0          # my lane when defending
+@export var def_tackle_radius: float = 26.0
+@export var def_tackle_time: float = 0.55
 @export var player_name: String = "Player"
 
 # Stamina
@@ -27,6 +30,10 @@ var advance_to_x: float = -1.0
 
 var stamina: float = 3.2
 var is_sprinting: bool = false
+
+# Defending
+var def_line_x: float = 400.0
+var def_contact: float = 0.0
 
 const PASS_TOLERANCE: float = 6.0
 const PASS_RANGE: float = 280.0
@@ -95,12 +102,74 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector2.ZERO
 		return
 
+	# When the AI team has the ball, this whole team defends
+	if GameState.player_defending():
+		if is_user_controlled:
+			_do_user_control()
+		else:
+			_do_defend(delta)
+		return
+
 	if is_user_controlled:
 		_do_user_control()
 	elif is_chasing_ball:
 		_do_chase_ball()
 	else:
 		_do_support()
+
+
+# ---------- DEFENDING ----------
+
+func _do_defend(delta: float) -> void:
+	var carrier: Node2D = _ai_carrier()
+	if carrier == null:
+		velocity = Vector2.ZERO
+		move_and_slide()
+		return
+
+	var dist: float = global_position.distance_to(carrier.global_position)
+
+	# In contact — hold on and complete the tackle
+	if dist < def_tackle_radius and GameState.can_tackle():
+		def_contact += delta
+		velocity = (carrier.global_position - global_position).limit_length(base_speed)
+		if def_contact >= def_tackle_time:
+			def_contact = 0.0
+			GameState.tackle_position = carrier.global_position
+			GameState.tackled_player = carrier
+			GameState.phase = GameState.Phase.RUCK
+			GameState.register_tackle()
+		move_and_slide()
+		return
+	def_contact = 0.0
+
+	# Closest two defenders commit; the rest hold the line
+	if _my_defensive_rank(carrier) < 2 and dist < 120.0:
+		var lead: Vector2 = carrier.velocity * 0.2
+		velocity = _avoid((carrier.global_position + lead - global_position).normalized() * base_speed)
+	else:
+		var target := Vector2(def_line_x, lerp(def_slot_y, carrier.global_position.y, 0.35))
+		target.y = clamp(target.y, 30.0, Field.FIELD_BOTTOM - 30.0)
+		velocity = _avoid((target - global_position).limit_length(base_speed))
+	move_and_slide()
+
+
+func _ai_carrier() -> Node2D:
+	var ball: Ball = get_ball()
+	if ball and ball.carrier and ball.carrier.is_in_group("defenders"):
+		return ball.carrier
+	return null
+
+
+func _my_defensive_rank(carrier: Node2D) -> int:
+	var my_d: float = global_position.distance_to(carrier.global_position)
+	var rank: int = 0
+	for a in get_tree().get_nodes_in_group("attackers"):
+		if a == self:
+			continue
+		if a.global_position.distance_to(carrier.global_position) < my_d:
+			rank += 1
+	return rank
 
 
 func _update_stamina(delta: float) -> void:
@@ -335,7 +404,7 @@ func _try_pass(direction: int) -> void:
 	if target.global_position.x > global_position.x + PASS_TOLERANCE:
 		print("FORWARD PASS!")
 		is_playing_the_ball = false
-		GameState.do_turnover()
+		GameState.do_turnover(global_position)
 		return
 
 	if is_playing_the_ball:

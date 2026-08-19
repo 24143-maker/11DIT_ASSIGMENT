@@ -8,16 +8,23 @@ class_name Defender
 #   MARKER     - stand over the tackled player at the ruck
 #   CHASE_BALL - go and get a loose ball
 
-enum State { LINE, CHASE, RETREAT, MARKER, CHASE_BALL, COVER }
+enum State { LINE, CHASE, RETREAT, MARKER, CHASE_BALL, COVER, FULLBACK, ATT_CARRY, ATT_SUPPORT, ATT_RUCK }
 
-@export var base_speed: float = 118.0
-@export var cover_speed: float = 142.0        # sprinting back after a break
-@export var retreat_speed_mult: float = 1.05   # ~124 px/s: a jog back, not a sprint
+@export var base_speed: float = 126.0
+@export var cover_speed: float = 150.0        # sprinting back after a break
+@export var retreat_speed_mult: float = 1.42   # brisk jog back into position
 @export var tackle_radius: float = 24.0
-@export var tackle_hold_time: float = 0.55    # seconds of contact to complete a tackle
+@export var tackle_hold_time: float = 0.50    # seconds of contact to complete a tackle
 @export var reaction_delay: float = 0.10
 @export var chase_distance: float = 95.0
 @export var line_slide: float = 0.45          # how far the line shifts toward the ball
+@export var is_fullback: bool = false         # the last line of defence
+@export var fullback_depth: float = 190.0     # how far behind the line he sits
+@export var fullback_speed: float = 178.0     # quickest player on the field
+@export var fullback_tackle_time: float = 0.12  # once he touches you, you're down
+@export var fullback_reach: float = 30.0        # slightly longer reach than a line defender
+@export var attack_speed: float = 118.0         # pace when this team has the ball
+@export var attack_slot: Vector2 = Vector2(-40, 272)   # support shape when attacking
 @export var give_up_distance: float = 190.0   # stop covering if beaten by more than this
 @export var marker_move_speed: float = 340.0  # how fast the marker gets square in front
 
@@ -80,6 +87,10 @@ func _physics_process(delta: float) -> void:
 		State.COVER:      _do_cover(delta)
 		State.RETREAT:    _do_retreat(delta)
 		State.CHASE_BALL: _do_chase_ball(delta)
+		State.FULLBACK:   _do_fullback(delta)
+		State.ATT_CARRY:  _do_att_carry(delta)
+		State.ATT_SUPPORT:_do_att_support(delta)
+		State.ATT_RUCK:   _do_att_ruck(delta)
 	move_and_slide()
 
 
@@ -279,7 +290,153 @@ func _do_marker(delta: float) -> void:
 
 func _do_chase_ball(_delta: float) -> void:
 	contact_timer = 0.0
-	velocity = _avoid((chase_target - global_position).limit_length(cover_speed))
+	# Chasing a kick is a flat-out sprint, not a jog
+	var spd: float = fullback_speed if is_fullback else (cover_speed * 1.12)
+	var to_target: Vector2 = chase_target - global_position
+	if to_target.length() > 6.0:
+		velocity = _avoid(to_target.normalized() * spd)
+	else:
+		velocity = Vector2.ZERO
+
+
+# Sits deep behind the line, shadowing the ball across the field.
+# Steps up and puts down anyone who breaks through.
+func _do_fullback(delta: float) -> void:
+	if ball_carrier == null:
+		contact_timer = 0.0
+		velocity = Vector2.ZERO
+		return
+
+	var can_hit: bool = GameState.can_tackle() and _carrier_actually_has_ball()
+
+	if can_hit:
+		var dist: float = global_position.distance_to(ball_carrier.global_position)
+
+		# Touched him — the fullback does not miss one on one
+		if dist < fullback_reach:
+			_grace = GRACE_TIME
+			if contact_timer <= 0.0:
+				_tackle_pos = ball_carrier.global_position
+			_track_ground_made()
+			contact_timer += delta
+			# Latch on: match his movement so he cannot be shrugged off
+			velocity = (ball_carrier.global_position - global_position).limit_length(fullback_speed)
+			if contact_timer >= fullback_tackle_time:
+				_complete_tackle()
+			return
+
+		# Brief grace so a half-step out of reach doesn't reset the hold
+		if _grace > 0.0:
+			_grace -= delta
+		else:
+			contact_timer = 0.0
+
+		# A break is judged by how many LINE defenders are still goal-side of
+		# the carrier. Using the deepest defender alone meant a single
+		# straggler behind the carrier hid an obvious break.
+		var cover_ahead: int = 0
+		for d in get_tree().get_nodes_in_group("defenders"):
+			if d.is_fullback:
+				continue
+			if d.global_position.x > ball_carrier.global_position.x + 10.0:
+				cover_ahead += 1
+
+		# Broken through, or simply close enough that I am the only one left
+		var broken: bool = cover_ahead <= 1 or dist < 170.0
+
+		if broken:
+			var lead: float = clamp(dist / fullback_speed, 0.15, 0.6)
+			var intercept: Vector2 = ball_carrier.global_position + ball_carrier.velocity * lead
+			velocity = _avoid((intercept - global_position).normalized() * fullback_speed, ball_carrier)
+			return
+
+	contact_timer = 0.0
+
+	# Otherwise hold station BEHIND the line, shadowing the ball.
+	# Never allow a target in front of the rearmost line defender.
+	var line_now: float = _rearmost_line_x()
+	var deep_x: float = max(line_now + fullback_depth, line_now + 40.0)
+	deep_x = clamp(deep_x, Field.FIELD_LEFT, Field.FIELD_RIGHT - 10.0)
+
+	var target := Vector2(deep_x, lerp(Field.FIELD_BOTTOM * 0.5, ball_carrier.global_position.y, 0.7))
+	target.y = clamp(target.y, 30.0, Field.FIELD_BOTTOM - 30.0)
+
+	# If we've somehow ended up ahead of the line, get back fast
+	if global_position.x < line_now + 20.0:
+		velocity = Vector2(fullback_speed, (target.y - global_position.y) * 0.6)
+		return
+
+	# Never back away from a carrier who is close — hold the line of defence
+	# and only track sideways.
+	if ball_carrier.global_position.distance_to(global_position) < 200.0:
+		if target.x > global_position.x:
+			target.x = global_position.x
+
+	velocity = _avoid((target - global_position).limit_length(base_speed), ball_carrier)
+
+
+# ---------------- ATTACKING (this team has the ball) ----------------
+
+# Run at the biggest gap in the defending line, drifting to avoid contact
+func _do_att_carry(_delta: float) -> void:
+	contact_timer = 0.0
+	var gap_y: float = _biggest_gap_y()
+	var aim := Vector2(Field.FIELD_LEFT - 40.0, gap_y)   # AI attacks right to left
+	var dir: Vector2 = (aim - global_position).normalized()
+	velocity = _avoid(dir * attack_speed)
+
+
+# Hold a support shape behind the carrier so a pass is always on
+func _do_att_support(_delta: float) -> void:
+	contact_timer = 0.0
+	if ball_carrier == null:
+		velocity = Vector2.ZERO
+		return
+	# AI attacks toward -x, so "behind" is a LARGER x
+	var target := Vector2(ball_carrier.global_position.x - attack_slot.x, attack_slot.y)
+	target.x = clamp(target.x, Field.FIELD_LEFT, Field.FIELD_RIGHT + 40.0)
+	target.y = clamp(target.y, 30.0, Field.FIELD_BOTTOM - 30.0)
+	velocity = _avoid((target - global_position).limit_length(attack_speed))
+
+
+func _do_att_ruck(_delta: float) -> void:
+	contact_timer = 0.0
+	velocity = Vector2.ZERO
+
+
+# Find the widest gap in the human team's defensive line
+func _biggest_gap_y() -> float:
+	var ys: Array = []
+	for a in get_tree().get_nodes_in_group("attackers"):
+		ys.append(a.global_position.y)
+	if ys.is_empty():
+		return Field.FIELD_BOTTOM * 0.5
+	ys.sort()
+
+	var best_gap: float = ys[0] - 0.0
+	var best_y: float = ys[0] * 0.5
+	for i in range(ys.size() - 1):
+		var g: float = ys[i + 1] - ys[i]
+		if g > best_gap:
+			best_gap = g
+			best_y = (ys[i] + ys[i + 1]) * 0.5
+	var tail: float = Field.FIELD_BOTTOM - ys[ys.size() - 1]
+	if tail > best_gap:
+		best_y = (ys[ys.size() - 1] + Field.FIELD_BOTTOM) * 0.5
+	return clamp(best_y, 40.0, Field.FIELD_BOTTOM - 40.0)
+
+
+# The x of the deepest line defender — the real edge of the defence
+func _rearmost_line_x() -> float:
+	var best: float = -1.0
+	for d in get_tree().get_nodes_in_group("defenders"):
+		if d.is_fullback:
+			continue
+		if d.global_position.x > best:
+			best = d.global_position.x
+	if best < 0.0:
+		best = line_x
+	return best
 
 
 func _end_chase() -> void:
@@ -305,7 +462,7 @@ func _my_rank_to_carrier() -> int:
 	var my_dist: float = global_position.distance_to(ball_carrier.global_position)
 	var rank: int = 0
 	for d in get_tree().get_nodes_in_group("defenders"):
-		if d == self or d.state == State.MARKER:
+		if d == self or d.state == State.MARKER or d.is_fullback:
 			continue
 		if d.global_position.distance_to(ball_carrier.global_position) < my_dist:
 			rank += 1

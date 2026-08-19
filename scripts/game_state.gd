@@ -23,6 +23,11 @@ var score: Array[int] = [0, 0]
 var phase: Phase = Phase.OPEN_PLAY
 var tackle_position: Vector2 = Vector2.ZERO   # where the ball is played from
 var tackled_player: Node2D = null             # who actually got tackled
+var turnover_position: Vector2 = Vector2.ZERO # where possession changed hands
+
+# true when the AI team has the ball and the human is defending
+func player_defending() -> bool:
+	return possession == 1
 
 # Convenience: can defenders tackle right now?
 func can_tackle() -> bool:
@@ -32,13 +37,15 @@ func can_tackle() -> bool:
 func register_tackle() -> void:
 	tackle_count += 1
 	if tackle_count >= TACKLES_PER_SET:
-		# Tackled on the last tackle -> hand the ball over
-		do_turnover()
+		# Tackled on the last tackle -> hand over where the tackle happened
+		do_turnover(tackle_position)
 	else:
 		tackle_made.emit(tackle_count)
 
 
-func do_turnover() -> void:
+func do_turnover(at: Vector2 = Vector2.ZERO) -> void:
+	if at != Vector2.ZERO:
+		turnover_position = at
 	tackle_count = 0
 	possession = 1 - possession
 	phase = Phase.OPEN_PLAY
