@@ -302,86 +302,75 @@ func _do_chase_ball(_delta: float) -> void:
 # Sits deep behind the line, shadowing the ball across the field.
 # Steps up and puts down anyone who breaks through.
 func _do_fullback(delta: float) -> void:
+	# No carrier yet — take up the deep covering post
 	if ball_carrier == null:
 		contact_timer = 0.0
-		velocity = Vector2.ZERO
+		var post := Vector2(
+			clamp(_rearmost_line_x() + fullback_depth, Field.FIELD_LEFT, Field.FIELD_RIGHT - 10.0),
+			Field.FIELD_BOTTOM * 0.5
+		)
+		velocity = (post - global_position).limit_length(base_speed)
 		return
 
+	var carrier_pos: Vector2 = ball_carrier.global_position
+	var dist: float = global_position.distance_to(carrier_pos)
 	var can_hit: bool = GameState.can_tackle() and _carrier_actually_has_ball()
 
 	if can_hit:
-		var dist: float = global_position.distance_to(ball_carrier.global_position)
-
-		# Touched him — the fullback does not miss one on one
+		# In contact — he does not miss one on one
 		if dist < fullback_reach:
 			_grace = GRACE_TIME
 			if contact_timer <= 0.0:
-				_tackle_pos = ball_carrier.global_position
+				_tackle_pos = carrier_pos
 			_track_ground_made()
 			contact_timer += delta
-			# Latch on: match his movement so he cannot be shrugged off
-			velocity = (ball_carrier.global_position - global_position).limit_length(fullback_speed)
+			velocity = (carrier_pos - global_position).limit_length(fullback_speed)
 			if contact_timer >= fullback_tackle_time:
 				_complete_tackle()
 			return
 
-		# Brief grace so a half-step out of reach doesn't reset the hold
 		if _grace > 0.0:
 			_grace -= delta
 		else:
 			contact_timer = 0.0
 
-		# A break is judged by how many LINE defenders are still goal-side of
-		# the carrier. Using the deepest defender alone meant a single
-		# straggler behind the carrier hid an obvious break.
-		var cover_ahead: int = 0
-		for d in get_tree().get_nodes_in_group("defenders"):
-			if d.is_fullback:
-				continue
-			if d.global_position.x > ball_carrier.global_position.x + 10.0:
-				cover_ahead += 1
-
-		# Broken through, or simply close enough that I am the only one left
-		var broken: bool = cover_ahead <= 1 or dist < 170.0
-
-		if broken:
-			var lead: float = clamp(dist / fullback_speed, 0.15, 0.6)
-			var intercept: Vector2 = ball_carrier.global_position + ball_carrier.velocity * lead
-			velocity = _avoid((intercept - global_position).normalized() * fullback_speed, ball_carrier)
+		# COMMIT if the carrier has beaten the line, or is simply near me.
+		# I sit behind everyone, so anyone close has already got through.
+		var line_now: float = _rearmost_line_x()
+		if carrier_pos.x > line_now - 30.0 or dist < 300.0:
+			var lead: float = clamp(dist / fullback_speed, 0.12, 0.55)
+			var aim: Vector2 = carrier_pos + ball_carrier.velocity * lead
+			velocity = _avoid((aim - global_position).normalized() * fullback_speed, ball_carrier)
 			return
 
 	contact_timer = 0.0
 
-	# Otherwise hold station BEHIND the line, shadowing the ball.
-	# Never allow a target in front of the rearmost line defender.
-	var line_now: float = _rearmost_line_x()
-	var deep_x: float = max(line_now + fullback_depth, line_now + 40.0)
+	# Hold station: behind the line, but never further from the carrier than
+	# a sensible covering distance, so he can't drift away down the field.
+	var line_x_now: float = _rearmost_line_x()
+	var deep_x: float = max(line_x_now + fullback_depth, line_x_now + 40.0)
+	deep_x = min(deep_x, carrier_pos.x + fullback_depth)
 	deep_x = clamp(deep_x, Field.FIELD_LEFT, Field.FIELD_RIGHT - 10.0)
 
-	var target := Vector2(deep_x, lerp(Field.FIELD_BOTTOM * 0.5, ball_carrier.global_position.y, 0.7))
+	var target := Vector2(deep_x, lerp(Field.FIELD_BOTTOM * 0.5, carrier_pos.y, 0.7))
 	target.y = clamp(target.y, 30.0, Field.FIELD_BOTTOM - 30.0)
 
-	# If we've somehow ended up ahead of the line, get back fast
-	if global_position.x < line_now + 20.0:
+	# In front of the line? Get back immediately.
+	if global_position.x < line_x_now + 20.0:
 		velocity = Vector2(fullback_speed, (target.y - global_position.y) * 0.6)
 		return
-
-	# Never back away from a carrier who is close — hold the line of defence
-	# and only track sideways.
-	if ball_carrier.global_position.distance_to(global_position) < 200.0:
-		if target.x > global_position.x:
-			target.x = global_position.x
 
 	velocity = _avoid((target - global_position).limit_length(base_speed), ball_carrier)
 
 
 # ---------------- ATTACKING (this team has the ball) ----------------
 
-# Run at the biggest gap in the defending line, drifting to avoid contact
+# Run at the biggest gap in the defending line
 func _do_att_carry(_delta: float) -> void:
 	contact_timer = 0.0
 	var gap_y: float = _biggest_gap_y()
-	var aim := Vector2(Field.FIELD_LEFT - 40.0, gap_y)   # AI attacks right to left
+	# The AI attacks right to left
+	var aim := Vector2(Field.FIELD_LEFT - 40.0, gap_y)
 	var dir: Vector2 = (aim - global_position).normalized()
 	velocity = _avoid(dir * attack_speed)
 
@@ -392,7 +381,7 @@ func _do_att_support(_delta: float) -> void:
 	if ball_carrier == null:
 		velocity = Vector2.ZERO
 		return
-	# AI attacks toward -x, so "behind" is a LARGER x
+	# Attacking toward -x, so "behind" is a LARGER x
 	var target := Vector2(ball_carrier.global_position.x - attack_slot.x, attack_slot.y)
 	target.x = clamp(target.x, Field.FIELD_LEFT, Field.FIELD_RIGHT + 40.0)
 	target.y = clamp(target.y, 30.0, Field.FIELD_BOTTOM - 30.0)
@@ -413,7 +402,7 @@ func _biggest_gap_y() -> float:
 		return Field.FIELD_BOTTOM * 0.5
 	ys.sort()
 
-	var best_gap: float = ys[0] - 0.0
+	var best_gap: float = ys[0]
 	var best_y: float = ys[0] * 0.5
 	for i in range(ys.size() - 1):
 		var g: float = ys[i + 1] - ys[i]

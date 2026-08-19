@@ -35,6 +35,16 @@ var stam_bar: ColorRect
 
 var _event_timer: float = 0.0
 
+# Narrated opposition set
+var story_bg: ColorRect
+var story_panel: ColorRect
+var story_text: Label
+var story_hint: Label
+var story_lines: Array = []
+var story_index: int = 0
+var story_active: bool = false
+signal story_finished()
+
 
 func _ready() -> void:
 	_build_scoreboard()
@@ -72,6 +82,7 @@ func _ready() -> void:
 
 	kick_label = _make_label(Vector2(220, 296), 16)
 
+	_build_story_panel()
 	_set_kick_visible(false)
 	_refresh()
 
@@ -159,6 +170,81 @@ func _make_label(pos: Vector2, size: int) -> Label:
 	l.add_theme_constant_override("outline_size", 4)
 	add_child(l)
 	return l
+
+
+func _build_story_panel() -> void:
+	story_bg = ColorRect.new()
+	story_bg.position = Vector2(0, 0)
+	story_bg.size = Vector2(640, 360)
+	story_bg.color = Color(0, 0, 0, 0.55)
+	add_child(story_bg)
+
+	story_panel = ColorRect.new()
+	story_panel.position = Vector2(70, 120)
+	story_panel.size = Vector2(500, 120)
+	story_panel.color = Color(0.07, 0.07, 0.09, 0.96)
+	add_child(story_panel)
+
+	story_text = Label.new()
+	story_text.position = Vector2(86, 136)
+	story_text.size = Vector2(468, 70)
+	story_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	story_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	story_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	story_text.add_theme_font_size_override("font_size", 17)
+	story_text.add_theme_color_override("font_color", Color.WHITE)
+	add_child(story_text)
+
+	story_hint = Label.new()
+	story_hint.position = Vector2(86, 212)
+	story_hint.size = Vector2(468, 20)
+	story_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	story_hint.text = "SPACE / CLICK TO CONTINUE"
+	story_hint.add_theme_font_size_override("font_size", 11)
+	story_hint.add_theme_color_override("font_color", Color(0.75, 0.78, 0.8))
+	add_child(story_hint)
+
+	_show_story(false)
+
+
+func _show_story(v: bool) -> void:
+	story_bg.visible = v
+	story_panel.visible = v
+	story_text.visible = v
+	story_hint.visible = v
+
+
+func play_story(lines: Array) -> void:
+	story_lines = lines
+	story_index = 0
+	story_active = true
+	_show_story(true)
+	if story_lines.size() > 0:
+		story_text.text = story_lines[0]
+
+
+func _advance_story() -> void:
+	story_index += 1
+	if story_index >= story_lines.size():
+		story_active = false
+		_show_story(false)
+		story_finished.emit()
+		return
+	story_text.text = story_lines[story_index]
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not story_active:
+		return
+	var go: bool = false
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_SPACE or event.keycode == KEY_ENTER:
+			go = true
+	elif event is InputEventMouseButton and event.pressed:
+		go = true
+	if go:
+		_advance_story()
+		get_viewport().set_input_as_handled()
 
 
 func _process(delta: float) -> void:

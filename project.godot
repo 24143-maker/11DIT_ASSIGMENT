@@ -13,6 +13,7 @@ config_version=5
 config/name="11dit Assigment"
 run/main_scene="uid://b743blvwst0tc"
 config/features=PackedStringArray("4.7", "GL Compatibility")
+boot_splash/bg_color=Color(0.038033716, 0.170627, 0.09322073, 1)
 
 [autoload]
 

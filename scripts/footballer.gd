@@ -9,8 +9,27 @@ class_name Footballer
 @export var strength_stat: int = 50
 @export var line_slot: Vector2 = Vector2(-30, 272)
 @export var def_slot_y: float = 272.0          # my lane when defending
-@export var def_tackle_radius: float = 26.0
-@export var def_tackle_time: float = 0.55
+@export var def_tackle_radius: float = 30.0
+@export var def_tackle_time: float = 0.45
+@export var def_is_fullback: bool = false
+@export var def_fullback_depth: float = 190.0
+@export var def_cover_speed: float = 150.0
+
+var def_is_marker: bool = false
+var def_marker_pos: Vector2 = Vector2.ZERO
+var def_state: int = 0            # DState
+var def_slot_index: int = 0
+var def_slot_count: int = 5
+var def_react: float = 0.0
+var def_grace: float = 0.0
+
+const DEF_SPACING: float = 78.0
+const DEF_CHASE_DIST: float = 95.0
+const DEF_REACTION: float = 0.10
+const DEF_GRACE: float = 0.20
+const DEF_RETREAT_MULT: float = 1.42
+const DEF_GIVE_UP: float = 190.0
+const DEF_MARKER_OFFSET: float = 16.0
 @export var player_name: String = "Player"
 
 # Stamina
@@ -48,6 +67,7 @@ var selected_kick: String = "grubber"
 var _aim_start_ms: int = 0
 var _aim_last_ms: int = 0
 var aim_arrow: Node2D = null
+var sel_arrow: Node2D = null      # marks the player you control
 
 const CHARGE_SECONDS: float = 0.9
 const AIM_TURN_SPEED: float = 2.0
@@ -64,6 +84,7 @@ func _ready() -> void:
 	collision_layer = 2
 	collision_mask = 1
 	_build_arrow()
+	_build_select_arrow()
 	for a in ["kick", "kick_grubber", "kick_bomb", "kick_long"]:
 		if not InputMap.has_action(a):
 			push_warning("Input action missing: " + a)
@@ -93,7 +114,34 @@ func _build_arrow() -> void:
 
 # ---------- MOVEMENT ----------
 
+func _build_select_arrow() -> void:
+	sel_arrow = Node2D.new()
+	sel_arrow.z_index = 25
+	sel_arrow.position = Vector2(0, -18)
+	add_child(sel_arrow)
+
+	var shadow := Polygon2D.new()
+	shadow.polygon = PackedVector2Array([
+		Vector2(-6, -7), Vector2(6, -7), Vector2(0, 2)
+	])
+	shadow.color = Color(0, 0, 0, 0.5)
+	shadow.position = Vector2(1, 1)
+	sel_arrow.add_child(shadow)
+
+	var tri := Polygon2D.new()
+	tri.polygon = PackedVector2Array([
+		Vector2(-5, -6), Vector2(5, -6), Vector2(0, 1)
+	])
+	tri.color = Color(1, 0.95, 0.25)
+	sel_arrow.add_child(tri)
+
+	sel_arrow.visible = false
+
+
 func _physics_process(delta: float) -> void:
+	# The arrow always sits above whoever the human is driving
+	if sel_arrow:
+		sel_arrow.visible = is_user_controlled
 	# Stamina ticks for EVERY player in EVERY state, so standing in the
 	# ruck or jogging in support both recover you.
 	_update_stamina(delta)
@@ -120,38 +168,259 @@ func _physics_process(delta: float) -> void:
 
 # ---------- DEFENDING ----------
 
+# =====================================================================
+# DEFENDING — a mirror of defender.gd's state machine.
+# The AI attacks toward -x, so "goal-side" here means a SMALLER x.
+# =====================================================================
+
+enum DState { LINE, CHASE, RETREAT, MARKER, COVER, FULLBACK }
+
 func _do_defend(delta: float) -> void:
-	var carrier: Node2D = _ai_carrier()
-	if carrier == null:
-		velocity = Vector2.ZERO
-		move_and_slide()
+	match def_state:
+		DState.LINE:     _def_line(delta)
+		DState.CHASE:    _def_chase(delta)
+		DState.COVER:    _def_cover(delta)
+		DState.RETREAT:  _def_retreat(delta)
+		DState.MARKER:   _def_marker(delta)
+		DState.FULLBACK: _def_fullback(delta)
+	move_and_slide()
+
+
+func _def_carrier() -> Node2D:
+	return _ai_carrier()
+
+
+func _def_line(delta: float) -> void:
+	def_contact = 0.0
+	def_line_x = clamp(def_line_x, Field.FIELD_LEFT + 6.0, Field.FIELD_RIGHT)
+	var target := Vector2(def_line_x, def_slot_y)
+
+	var carrier: Node2D = _def_carrier()
+	if carrier and GameState.can_tackle():
+		# Line break: carrier is goal-side of me
+		if carrier.global_position.x < global_position.x - 4.0:
+			def_state = DState.COVER
+			return
+
+		# Slide as a unit, keeping even spacing
+		var mid: float = float(def_slot_count - 1) * 0.5
+		var centre: float = lerp(Field.FIELD_BOTTOM * 0.5, carrier.global_position.y, 0.45)
+		target.y = centre + (float(def_slot_index) - mid) * DEF_SPACING
+		target.y = clamp(target.y, 30.0, Field.FIELD_BOTTOM - 30.0)
+
+		var dist: float = global_position.distance_to(carrier.global_position)
+		if dist < DEF_CHASE_DIST and _def_rank(carrier) < 2:
+			def_react += delta
+			if def_react >= DEF_REACTION:
+				def_state = DState.CHASE
+				def_react = 0.0
+				def_contact = 0.0
+				def_grace = 0.0
+		else:
+			def_react = 0.0
+
+	velocity = _avoid((target - global_position).limit_length(base_speed))
+
+
+func _def_chase(delta: float) -> void:
+	var carrier: Node2D = _def_carrier()
+	if carrier == null or not GameState.can_tackle():
+		_def_end_chase()
+		return
+
+	if carrier.global_position.x < global_position.x - 6.0:
+		def_state = DState.COVER
+		def_contact = 0.0
 		return
 
 	var dist: float = global_position.distance_to(carrier.global_position)
 
-	# In contact — hold on and complete the tackle
-	if dist < def_tackle_radius and GameState.can_tackle():
-		def_contact += delta
+	if dist < def_tackle_radius:
+		def_grace = DEF_GRACE
+		var tacklers: int = _def_count_tacklers(carrier)
+		def_contact += delta * (1.0 + 0.7 * float(max(tacklers - 1, 0)))
 		velocity = (carrier.global_position - global_position).limit_length(base_speed)
 		if def_contact >= def_tackle_time:
-			def_contact = 0.0
-			GameState.tackle_position = carrier.global_position
-			GameState.tackled_player = carrier
-			GameState.phase = GameState.Phase.RUCK
-			GameState.register_tackle()
-		move_and_slide()
+			_def_complete_tackle(carrier)
 		return
-	def_contact = 0.0
 
-	# Closest two defenders commit; the rest hold the line
-	if _my_defensive_rank(carrier) < 2 and dist < 120.0:
-		var lead: Vector2 = carrier.velocity * 0.2
-		velocity = _avoid((carrier.global_position + lead - global_position).normalized() * base_speed)
+	if def_grace > 0.0:
+		def_grace -= delta
 	else:
-		var target := Vector2(def_line_x, lerp(def_slot_y, carrier.global_position.y, 0.35))
-		target.y = clamp(target.y, 30.0, Field.FIELD_BOTTOM - 30.0)
-		velocity = _avoid((target - global_position).limit_length(base_speed))
-	move_and_slide()
+		def_contact = 0.0
+
+	if dist > DEF_CHASE_DIST * 1.8:
+		_def_end_chase()
+		return
+
+	var lead: Vector2 = carrier.velocity * 0.2
+	velocity = _avoid((carrier.global_position + lead - global_position).normalized() * base_speed)
+
+
+func _def_cover(delta: float) -> void:
+	var carrier: Node2D = _def_carrier()
+	if carrier == null or not GameState.can_tackle():
+		_def_end_chase()
+		return
+
+	# Back in front of the carrier — rejoin the line
+	if global_position.x < carrier.global_position.x - 40.0:
+		def_state = DState.LINE
+		return
+
+	# Hopelessly beaten — reform instead of trailing
+	if global_position.x - carrier.global_position.x > DEF_GIVE_UP:
+		def_state = DState.LINE
+		return
+
+	var dist: float = global_position.distance_to(carrier.global_position)
+
+	if dist < def_tackle_radius:
+		def_grace = DEF_GRACE
+		var tacklers: int = _def_count_tacklers(carrier)
+		def_contact += delta * (1.0 + 0.7 * float(max(tacklers - 1, 0)))
+		velocity = (carrier.global_position - global_position).limit_length(def_cover_speed)
+		if def_contact >= def_tackle_time:
+			_def_complete_tackle(carrier)
+		return
+
+	if def_grace > 0.0:
+		def_grace -= delta
+	else:
+		def_contact = 0.0
+
+	var intercept: Vector2 = carrier.global_position + carrier.velocity * 0.45
+	velocity = _avoid((intercept - global_position).normalized() * def_cover_speed)
+
+
+func _def_retreat(_delta: float) -> void:
+	def_contact = 0.0
+	var target := Vector2(def_line_x, def_slot_y)
+	var to_t: Vector2 = target - global_position
+	if to_t.length() < 12.0:
+		velocity = Vector2.ZERO
+		def_state = DState.LINE
+		return
+	velocity = to_t.normalized() * (base_speed * DEF_RETREAT_MULT)
+
+
+func _def_marker(delta: float) -> void:
+	def_contact = 0.0
+	velocity = Vector2.ZERO
+	var carrier: Node2D = _def_carrier()
+	var mp: Vector2 = def_marker_pos
+	if carrier != null:
+		mp = carrier.global_position - Vector2(DEF_MARKER_OFFSET, 0.0)
+	global_position = global_position.move_toward(mp, 340.0 * delta)
+
+
+func _def_fullback(delta: float) -> void:
+	var carrier: Node2D = _def_carrier()
+	if carrier == null:
+		def_contact = 0.0
+		var post := Vector2(
+			clamp(_front_line_x() - def_fullback_depth, Field.FIELD_LEFT + 10.0, Field.FIELD_RIGHT),
+			Field.FIELD_BOTTOM * 0.5
+		)
+		velocity = (post - global_position).limit_length(base_speed)
+		return
+
+	var dist: float = global_position.distance_to(carrier.global_position)
+
+	if GameState.can_tackle():
+		if dist < def_tackle_radius + 4.0:
+			def_grace = DEF_GRACE
+			def_contact += delta
+			velocity = (carrier.global_position - global_position).limit_length(def_cover_speed)
+			if def_contact >= 0.12:
+				_def_complete_tackle(carrier)
+			return
+		if def_grace > 0.0:
+			def_grace -= delta
+		else:
+			def_contact = 0.0
+
+		# Commit only on a genuine break
+		var cover_ahead: int = 0
+		for a in get_tree().get_nodes_in_group("attackers"):
+			if a == self or a.def_is_fullback:
+				continue
+			if a.global_position.x < carrier.global_position.x - 10.0:
+				cover_ahead += 1
+
+		if cover_ahead <= 1 or dist < 300.0:
+			var lead: float = clamp(dist / def_cover_speed, 0.12, 0.55)
+			var aim: Vector2 = carrier.global_position + carrier.velocity * lead
+			velocity = _avoid((aim - global_position).normalized() * def_cover_speed)
+			return
+
+	def_contact = 0.0
+	var line_now: float = _front_line_x()
+	var deep_x: float = min(line_now - def_fullback_depth, line_now - 40.0)
+	deep_x = max(deep_x, carrier.global_position.x - def_fullback_depth)
+	deep_x = clamp(deep_x, Field.FIELD_LEFT + 10.0, Field.FIELD_RIGHT)
+
+	var target := Vector2(deep_x, lerp(Field.FIELD_BOTTOM * 0.5, carrier.global_position.y, 0.7))
+	target.y = clamp(target.y, 30.0, Field.FIELD_BOTTOM - 30.0)
+
+	if global_position.x > line_now - 20.0:
+		velocity = Vector2(-def_cover_speed, (target.y - global_position.y) * 0.6)
+		return
+
+	velocity = _avoid((target - global_position).limit_length(base_speed))
+
+
+# ---------- defensive helpers ----------
+
+func _def_end_chase() -> void:
+	def_contact = 0.0
+	def_grace = 0.0
+	def_state = DState.LINE
+
+
+func _def_rank(carrier: Node2D) -> int:
+	var my_d: float = global_position.distance_to(carrier.global_position)
+	var rank: int = 0
+	for a in get_tree().get_nodes_in_group("attackers"):
+		if a == self or a.def_is_fullback or a.def_state == DState.MARKER:
+			continue
+		if a.global_position.distance_to(carrier.global_position) < my_d:
+			rank += 1
+	return rank
+
+
+func _def_count_tacklers(carrier: Node2D) -> int:
+	var n: int = 0
+	for a in get_tree().get_nodes_in_group("attackers"):
+		if a.def_state != DState.CHASE and a.def_state != DState.COVER:
+			continue
+		if a.global_position.distance_to(carrier.global_position) < a.def_tackle_radius:
+			n += 1
+	return n
+
+
+func _def_complete_tackle(carrier: Node2D) -> void:
+	def_contact = 0.0
+	def_grace = 0.0
+	if not GameState.can_tackle():
+		return
+	GameState.tackle_position = carrier.global_position
+	GameState.tackled_player = carrier
+	GameState.phase = GameState.Phase.RUCK
+	GameState.register_tackle()
+
+
+# The x of our most advanced line defender
+func _front_line_x() -> float:
+	var best: float = 99999.0
+	for a in get_tree().get_nodes_in_group("attackers"):
+		if a.def_is_fullback:
+			continue
+		if a.global_position.x < best:
+			best = a.global_position.x
+	if best > 90000.0:
+		best = def_line_x
+	return best
 
 
 func _ai_carrier() -> Node2D:

@@ -3,7 +3,9 @@ extends Node2D
 
 const RETREAT_METRES: float = 12.0
 const MARKER_METRES: float = 1.5
-const DEFENDER_COUNT: int = 5   # plus one fullback = 6
+# Line defenders. Set at runtime to (number of attackers - 1) so the two
+# teams are even once the fullback is included.
+var DEFENDER_COUNT: int = 5
 const DEFENDER_SCENE := preload("res://scenes/entities/defender.tscn")
 
 # Squad names, applied in scene-tree order to any player left as "Player"
@@ -37,6 +39,8 @@ var fullback: Defender = null          # the defending team's last line
 var fullback_hunting: bool = false     # true while he is going for a kicked ball
 var ai_carrier: Node2D = null        # the AI's ball runner when they attack
 var ai_pass_timer: float = 0.0
+var switch_cooldown: float = 0.0
+var _pending_result = null
 var kick_chaser: Node2D = null          # the one player committed to chasing a kick
 var kick_control_delay: float = 0.0     # counts down before control switches to them
 
@@ -68,6 +72,8 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_handle_player_switch(delta)
+	_keep_fullback_deep()
 	_update_fullback_hunt()
 	_update_ai_set(delta)
 
@@ -115,6 +121,10 @@ func get_ball() -> Ball:
 
 
 func _spawn_defensive_line(line_x: float) -> void:
+	# Match the attacking side: one fewer in the line, plus a fullback
+	var att_count: int = get_tree().get_nodes_in_group("attackers").size()
+	DEFENDER_COUNT = max(att_count - 1, 3)
+
 	var spacing: float = Field.FIELD_BOTTOM / float(DEFENDER_COUNT + 1)
 	for i in range(DEFENDER_COUNT):
 		var d: Defender = DEFENDER_SCENE.instantiate()
@@ -153,6 +163,9 @@ func _kickoff() -> void:
 	GameState.possession = 0
 	GameState.turnover_position = Vector2.ZERO
 	ai_carrier = null
+	for a in get_tree().get_nodes_in_group("attackers"):
+		a.def_is_fullback = false
+	_restore_defensive_roles(Field.centre().x + 45.0)
 	kickoff_in_progress = true
 	kickoff_chase = false
 	kickoff_receiver = null
@@ -194,6 +207,7 @@ func _kickoff() -> void:
 		d.ball_carrier = null
 		d.line_x = Field.centre().x + 45.0
 		if d.is_fullback:
+			d.state = Defender.State.FULLBACK
 			continue          # placed on the centre spot below
 		d.slot_y = spacing * float(i2 + 1)
 		d.global_position = Vector2(d.line_x, d.slot_y)
@@ -219,9 +233,10 @@ func _kickoff() -> void:
 		return
 
 	# Random landing spot somewhere in the receiving half
-	# Must clear the 10m line (x = 128). Land between roughly the 15m and 40m.
+	# A kick-off must travel at least 30m from halfway.
+	# Halfway is x=448, so the ball has to land at x <= 208.
 	kickoff_landing = Vector2(
-		randf_range(Field.FIELD_LEFT + 120.0, Field.FIELD_LEFT + 320.0),
+		randf_range(Field.FIELD_LEFT + 40.0, Field.FIELD_LEFT + 160.0),
 		randf_range(80.0, Field.FIELD_BOTTOM - 80.0)
 	)
 	var to_target: Vector2 = kickoff_landing - kicker.global_position
@@ -400,16 +415,22 @@ func _on_played_the_ball() -> void:
 
 
 func _ai_play_the_ball() -> void:
+	var ruck: Vector2 = GameState.tackle_position
+
 	var tackled: Node2D = GameState.tackled_player
 	if tackled and is_instance_valid(tackled) and tackled.is_in_group("defenders"):
 		ai_carrier = tackled
-		ai_carrier.global_position = GameState.tackle_position
+	if ai_carrier and is_instance_valid(ai_carrier):
+		ai_carrier.global_position = ruck
 		ai_carrier.state = Defender.State.ATT_RUCK
 
-	# Your line must retreat 10m from the ruck
-	var line_x: float = GameState.tackle_position.x - Field.metres_to_pixels(RETREAT_METRES)
-	for a in get_tree().get_nodes_in_group("attackers"):
-		a.def_line_x = line_x
+	for d in get_tree().get_nodes_in_group("defenders"):
+		if d == ai_carrier:
+			continue
+		d.state = Defender.State.ATT_SUPPORT
+		d.ball_carrier = ai_carrier
+
+	_set_human_defence(ruck, true)
 
 	await get_tree().create_timer(0.9).timeout
 
@@ -418,8 +439,113 @@ func _ai_play_the_ball() -> void:
 		var ball: Ball = get_ball()
 		if ball:
 			ball.give_to(ai_carrier)
+
+	# Marker rejoins the line
+	for a in get_tree().get_nodes_in_group("attackers"):
+		if a.def_is_marker:
+			a.def_is_marker = false
+			a.def_state = Footballer.DState.LINE
+
 	GameState.phase = GameState.Phase.OPEN_PLAY
 	_hand_defensive_control()
+
+
+# Lay out your defence: retreat line, even slots, a marker and a fullback.
+# Mirrors what _on_tackle_made does for the AI defence.
+func _set_human_defence(ruck: Vector2, with_marker: bool) -> void:
+	var line_x: float = clamp(
+		ruck.x - Field.metres_to_pixels(RETREAT_METRES),
+		Field.FIELD_LEFT + 6.0, Field.FIELD_RIGHT
+	)
+
+	var atk: Array = get_tree().get_nodes_in_group("attackers")
+	if atk.is_empty():
+		return
+
+	# Nominate the fullback: the deepest player (largest x)
+	var fb = atk[0]
+	for a in atk:
+		if a.global_position.x > fb.global_position.x:
+			fb = a
+
+	# Marker: nearest to the ruck, never the fullback
+	var marker_man = null
+	var best: float = INF
+	if with_marker:
+		for a in atk:
+			if a == fb:
+				continue
+			var dd: float = a.global_position.distance_to(ruck)
+			if dd < best:
+				best = dd
+				marker_man = a
+
+	var line_men: int = max(atk.size() - 1, 1)
+	var gap: float = Field.FIELD_BOTTOM / float(line_men + 1)
+	var slot: int = 0
+
+	for a in atk:
+		a.def_contact = 0.0
+		a.def_react = 0.0
+		a.def_grace = 0.0
+		a.def_line_x = line_x
+		a.def_is_fullback = (a == fb)
+		a.def_is_marker = (a == marker_man)
+		a.is_chasing_ball = false
+		a.advance_to_x = -1.0
+		a.is_playing_the_ball = false
+
+		if a.def_is_fullback:
+			a.def_state = Footballer.DState.FULLBACK
+			continue
+		if a.def_is_marker:
+			a.def_state = Footballer.DState.MARKER
+			a.def_marker_pos = ruck - Vector2(MARKER_METRES * Field.METRE, 0)
+			continue
+
+		a.def_slot_index = slot
+		a.def_slot_count = line_men
+		a.def_slot_y = gap * float(slot + 1)
+		a.def_state = Footballer.DState.RETREAT
+		slot += 1
+
+
+# ---------- SWITCHING PLAYERS ON DEFENCE ----------
+
+# While defending, tapping W or S moves control up or down the line.
+func _handle_player_switch(delta: float) -> void:
+	if switch_cooldown > 0.0:
+		switch_cooldown -= delta
+	if not GameState.player_defending():
+		return
+	if switch_cooldown > 0.0:
+		return
+
+	# J and L step control along the defensive line
+	var dir: int = 0
+	if Input.is_action_just_pressed("pass_left"):
+		dir = -1
+	elif Input.is_action_just_pressed("pass_right"):
+		dir = 1
+	if dir == 0:
+		return
+
+	var list: Array = get_tree().get_nodes_in_group("attackers")
+	if list.size() < 2:
+		return
+	# Order down the field so switching feels like moving along the line
+	list.sort_custom(func(a, b): return a.global_position.y < b.global_position.y)
+
+	var idx: int = 0
+	for i in range(list.size()):
+		if list[i].is_user_controlled:
+			idx = i
+			break
+
+	var next_i: int = wrapi(idx + dir, 0, list.size())
+	for a in list:
+		a.is_user_controlled = (a == list[next_i])
+	switch_cooldown = 0.18
 
 
 # ---------- AI ATTACKING SET ----------
@@ -441,14 +567,14 @@ func _update_ai_set(delta: float) -> void:
 		if d != ai_carrier:
 			d.ball_carrier = ai_carrier
 
-	# Under pressure? Look for a pass
+	# Only pass when genuinely shut down, and never twice in quick succession
 	ai_pass_timer -= delta
 	var pressure: int = 0
 	for a in get_tree().get_nodes_in_group("attackers"):
-		if a.global_position.distance_to(ai_carrier.global_position) < 46.0:
+		if a.global_position.distance_to(ai_carrier.global_position) < 38.0:
 			pressure += 1
 
-	if pressure > 0 and ai_pass_timer <= 0.0:
+	if pressure >= 1 and ai_pass_timer <= 0.0 and randf() < 0.35:
 		_ai_try_pass()
 
 	# Last tackle: kick rather than hand it back
@@ -468,7 +594,8 @@ func _ai_try_pass() -> void:
 		if off.x < -6.0:
 			continue
 		var dist: float = off.length()
-		if dist < best_d and dist > 30.0:
+		# Must be a real pass, and the receiver must have more space than me
+		if dist < best_d and dist > 70.0 and _space_around(d) > _space_around(ai_carrier):
 			best_d = dist
 			best = d
 	if best == null:
@@ -481,8 +608,18 @@ func _ai_try_pass() -> void:
 	ai_carrier.state = Defender.State.ATT_SUPPORT
 	ai_carrier = best
 	ai_carrier.state = Defender.State.ATT_CARRY
-	ai_pass_timer = 0.7
+	ai_pass_timer = 1.6
 	_hand_defensive_control()
+
+
+# How far the nearest human defender is from this player
+func _space_around(who: Node2D) -> float:
+	var best: float = 9999.0
+	for a in get_tree().get_nodes_in_group("attackers"):
+		var d: float = a.global_position.distance_to(who.global_position)
+		if d < best:
+			best = d
+	return best
 
 
 func _ai_kick() -> void:
@@ -494,6 +631,26 @@ func _ai_kick() -> void:
 	ball.kick(ai_carrier.global_position, dir, 0.9, kind)
 	event_message.emit("THEY KICK")
 	ai_carrier = null
+
+
+# The fullback must always be doing his job unless he is chasing a ball
+# or the AI team is attacking. Other systems used to strand him in the line.
+func _keep_fullback_deep() -> void:
+	if fullback == null or not is_instance_valid(fullback):
+		return
+	if GameState.player_defending():
+		return                      # he's an attacker right now
+	if fullback_hunting:
+		return                      # going for a kicked ball
+	if kickoff_in_progress:
+		return                      # taking / just took the kick-off
+	if fullback.state == Defender.State.CHASE_BALL:
+		return
+
+	if fullback.state != Defender.State.FULLBACK:
+		fullback.state = Defender.State.FULLBACK
+	if fullback.ball_carrier == null and current_carrier != null:
+		fullback.ball_carrier = current_carrier
 
 
 # ---------- FULLBACK BALL HUNT ----------
@@ -824,29 +981,106 @@ func _on_turnover() -> void:
 	_stop_attacker_chase()
 	GameState.phase = GameState.Phase.OPEN_PLAY
 
-	# The set restarts WHERE THE BALL WAS LOST, not at halfway
 	var spot: Vector2 = GameState.turnover_position
 	if spot == Vector2.ZERO:
 		spot = current_carrier.global_position if current_carrier else Field.centre()
 	spot.x = clamp(spot.x, Field.FIELD_LEFT + 30.0, Field.FIELD_RIGHT - 30.0)
 	spot.y = clamp(spot.y, 60.0, Field.FIELD_BOTTOM - 60.0)
 
-	if GameState.player_defending():
-		event_message.emit("THEIR BALL")
-		_start_ai_set(spot)
-	else:
-		event_message.emit("OUR BALL")
-		_start_player_set(spot)
+	# The opposition's set is narrated, not played out
+	_run_opposition_set(spot)
+
+
+# Freeze play, tell the story of their set, then hand the ball back
+func _run_opposition_set(spot: Vector2) -> void:
+	GameState.phase = GameState.Phase.DEAD
+	clock_running = false
+
+	var result = OppositionSet.simulate(spot.x, GameState.AWAY_SHORT)
+
+	var hud := _find_hud()
+	if hud == null:
+		# No HUD to narrate with — just apply the outcome
+		_finish_opposition_set(result)
+		return
+
+	if not hud.story_finished.is_connected(_on_story_done):
+		hud.story_finished.connect(_on_story_done)
+	_pending_result = result
+	hud.play_story(result.lines)
+
+
+func _on_story_done() -> void:
+	_finish_opposition_set(_pending_result)
+	_pending_result = null
+
+
+func _finish_opposition_set(result) -> void:
+	clock_running = true
+	GameState.possession = 0
+	GameState.reset_set()
+	GameState.turnover_position = Vector2.ZERO
+	GameState.phase = GameState.Phase.OPEN_PLAY
+
+	if result == null:
+		_start_player_set(Field.centre())
+		return
+
+	if result.they_scored:
+		GameState.score[1] += 4
+		GameState.score_changed.emit()
+		event_message.emit("THEY SCORE")
+		_kickoff()
+		return
+
+	var spot := Vector2(
+		clamp(result.restart_x, Field.FIELD_LEFT + 40.0, Field.FIELD_RIGHT - 40.0),
+		Field.FIELD_BOTTOM * 0.5
+	)
+	event_message.emit("OUR BALL")
+	_start_player_set(spot)
+
+
+func _find_hud() -> Node:
+	for c in get_children():
+		if c is CanvasLayer and c.has_method("play_story"):
+			return c
+	return null
 
 
 func _start_player_set(spot: Vector2) -> void:
 	ai_carrier = null
+	for a in get_tree().get_nodes_in_group("attackers"):
+		a.def_is_fullback = false
+	_restore_defensive_roles(spot.x + Field.metres_to_pixels(RETREAT_METRES))
 	_reset_attack_positions(spot)
 	var first = _first_attacker()
 	if first:
 		first.global_position = spot
 		_give_ball_to(first)
 	_reset_defensive_line(spot.x + Field.metres_to_pixels(RETREAT_METRES))
+
+
+# Put every AI player back into their defending job, fullback included
+func _restore_defensive_roles(line_x: float) -> void:
+	var spacing: float = Field.FIELD_BOTTOM / float(DEFENDER_COUNT + 1)
+	var i: int = 0
+	for d in get_tree().get_nodes_in_group("defenders"):
+		d.marker_target = null
+		d.line_x = line_x
+		if d.is_fullback:
+			d.state = Defender.State.FULLBACK
+			d.global_position = Vector2(
+				clamp(line_x + d.fullback_depth, Field.FIELD_LEFT, Field.FIELD_RIGHT - 20.0),
+				Field.FIELD_BOTTOM * 0.5
+			)
+			continue
+		d.slot_index = i
+		d.slot_count = DEFENDER_COUNT
+		d.slot_y = spacing * float(i + 1)
+		d.state = Defender.State.RETREAT
+		i += 1
+	marker_defender = null
 
 
 # The AI team attacks from `spot`; the human defends.
@@ -877,17 +1111,7 @@ func _start_ai_set(spot: Vector2) -> void:
 		ball.give_to(ai_carrier)
 
 	# Your team drops into a defensive line 10m in front of the ball
-	var line_x: float = spot.x - Field.metres_to_pixels(RETREAT_METRES)
-	var lanes2: Array = [90.0, 180.0, 272.0, 364.0, 454.0, 272.0]
-	var atk: Array = get_tree().get_nodes_in_group("attackers")
-	for i in range(atk.size()):
-		var a = atk[i]
-		a.is_chasing_ball = false
-		a.advance_to_x = -1.0
-		a.is_playing_the_ball = false
-		a.def_line_x = line_x
-		a.def_slot_y = lanes2[i % lanes2.size()]
-		a.global_position = Vector2(line_x, a.def_slot_y)
+	_set_human_defence(spot, false)
 	_hand_defensive_control()
 
 

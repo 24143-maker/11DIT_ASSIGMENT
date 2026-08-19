@@ -17,6 +17,7 @@ size = Vector2(16, 544)
 script = ExtResource("1_klj7n")
 
 [node name="field" type="Sprite2D" parent="." unique_id=415785008]
+z_index = -10
 texture = ExtResource("2_o7pxg")
 centered = false
 
@@ -44,16 +45,7 @@ shape = SubResource("RectangleShape2D_klj7n")
 
 [node name="Footballer" parent="." unique_id=886370576 groups=["attackers"] instance=ExtResource("3_h1ndw")]
 position = Vector2(114, 235)
-base_speed = null
-sprint_multiplier = null
-hands_stat = null
-strength_stat = null
 line_slot = Vector2(0, 140)
-player_name = null
-stamina_max = null
-stamina_drain = null
-stamina_regen = null
-tired_speed_mult = null
 
 [node name="Camera2D" type="Camera2D" parent="Footballer" unique_id=1388044688]
 zoom = Vector2(0.65, 0.65)
@@ -65,55 +57,19 @@ position_smoothing_enabled = true
 
 [node name="Footballer2" parent="." unique_id=102084955 groups=["attackers"] instance=ExtResource("3_h1ndw")]
 position = Vector2(62, 303)
-base_speed = null
-sprint_multiplier = null
-hands_stat = null
-strength_stat = null
 line_slot = Vector2(-30, 230)
-player_name = null
-stamina_max = null
-stamina_drain = null
-stamina_regen = null
-tired_speed_mult = null
 
 [node name="Footballer3" parent="." unique_id=1510273732 groups=["attackers"] instance=ExtResource("3_h1ndw")]
 position = Vector2(60, 141)
-base_speed = null
-sprint_multiplier = null
-hands_stat = null
-strength_stat = null
 line_slot = Vector2(-30, 320)
-player_name = null
-stamina_max = null
-stamina_drain = null
-stamina_regen = null
-tired_speed_mult = null
 
 [node name="Footballer4" parent="." unique_id=742142067 groups=["attackers"] instance=ExtResource("3_h1ndw")]
 position = Vector2(82, 261)
-base_speed = null
-sprint_multiplier = null
-hands_stat = null
-strength_stat = null
 line_slot = Vector2(-40, 410)
-player_name = null
-stamina_max = null
-stamina_drain = null
-stamina_regen = null
-tired_speed_mult = null
 
 [node name="Footballer5" parent="." unique_id=2004962205 groups=["attackers"] instance=ExtResource("3_h1ndw")]
 position = Vector2(88, 195)
-base_speed = null
-sprint_multiplier = null
-hands_stat = null
-strength_stat = null
 line_slot = Vector2(-40, 500)
-player_name = null
-stamina_max = null
-stamina_drain = null
-stamina_regen = null
-tired_speed_mult = null
 
 [node name="Ball" parent="." unique_id=191674890 groups=["ball"] instance=ExtResource("5_86swp")]
 position = Vector2(134.00002, 235.00002)
