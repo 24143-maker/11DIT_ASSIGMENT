@@ -1,69 +1,92 @@
 extends RefCounted
 class_name OppositionSet
-# Simulates the opposition's set of six as a short sequence of text beats.
-# Returns the narration lines plus where the ball ends up.
+# Pre-simulates the opposition's whole set BEFORE anything is shown.
+# Returns a list of beats; each beat is one tackle with the resulting
+# ball position. The match then plays them out one at a time.
 
 const METRE := 8.0
 
-class Result:
-	var lines: Array[String] = []
-	var restart_x: float = 448.0     # where YOUR next set begins
-	var they_scored: bool = false
+# kind: "run", "break", "error", "kick", "try"
+static func simulate(start_x: float, team: String) -> Array:
+	var beats: Array = []
+	var x: float = start_x            # they attack toward the LEFT try line
+	var y: float = Field.FIELD_BOTTOM * 0.5
 
+	beats.append({
+		"text": "%s take over on the %dm." % [team, _metres(x)],
+		"ball_x": x, "ball_y": y, "kind": "start"
+	})
 
-static func simulate(start_x: float, team_name: String) -> Result:
-	var r := Result.new()
-	var x: float = start_x           # they attack toward the LEFT try line
-	var tackle: int = 0
-
-	r.lines.append("%s take over on the %dm line." % [team_name, _metres_out(x)])
-
-	while tackle < 5:
-		tackle += 1
-
-		# Rare handling error hands it straight back
+	for tackle in range(1, 6):
+		# Handling error hands it straight back
 		if randf() < 0.07:
-			r.lines.append("Tackle %d — they spill it! Knock on, your ball." % tackle)
-			r.restart_x = x
-			return r
+			beats.append({
+				"text": "Tackle %d — spilled it! Knock on, your ball." % tackle,
+				"ball_x": x, "ball_y": y, "kind": "error"
+			})
+			return beats
 
-		var gain: float = randf_range(3.0, 13.0) * METRE
+		var gain: float
+		var kind: String
+		var text: String
+
 		if randf() < 0.18:
-			gain += randf_range(8.0, 20.0) * METRE
-			r.lines.append("Tackle %d — they break the line and surge upfield." % tackle)
+			gain = randf_range(14.0, 30.0) * METRE
+			kind = "break"
+			text = "Tackle %d — %s break the line and surge %dm upfield." % [
+				tackle, team, int(gain / METRE)
+			]
 		else:
-			r.lines.append("Tackle %d — hit up through the middle, a few metres." % tackle)
+			gain = randf_range(3.0, 12.0) * METRE
+			kind = "run"
+			text = "Tackle %d — hit up for %dm." % [tackle, int(gain / METRE)]
 
 		x -= gain
+		y = clamp(y + randf_range(-70.0, 70.0), 90.0, Field.FIELD_BOTTOM - 90.0)
 
-		# Close enough to score?
-		if x <= Field.FIELD_LEFT:
-			r.lines.append("They crash over in the corner. Try to %s." % team_name)
-			r.they_scored = true
-			return r
+		if x <= Field.FIELD_LEFT + 4.0:
+			x = Field.FIELD_LEFT
+			beats.append({
+				"text": "%s crash over. Try to %s." % [team, team],
+				"ball_x": x, "ball_y": y, "kind": "try"
+			})
+			return beats
+
+		beats.append({"text": text, "ball_x": x, "ball_y": y, "kind": kind})
 
 	# Last tackle
 	var roll: float = randf()
 	if x < Field.FIELD_LEFT + 200.0 and roll < 0.30:
 		if randf() < 0.4:
-			r.lines.append("Last tackle — grubber into the in-goal, and they regather! Try.")
-			r.they_scored = true
-			return r
-		r.lines.append("Last tackle — grubber through, but it rolls dead. Your ball.")
-		r.restart_x = Field.FIELD_LEFT + 160.0
-		return r
+			beats.append({
+				"text": "Last tackle — grubber in behind, and they regather! Try.",
+				"ball_x": Field.FIELD_LEFT, "ball_y": y, "kind": "try"
+			})
+		else:
+			beats.append({
+				"text": "Last tackle — grubber through, but it rolls dead. Your ball.",
+				"ball_x": Field.FIELD_LEFT + 160.0, "ball_y": y, "kind": "kick"
+			})
+		return beats
 
+	var land: float
 	if roll < 0.75:
-		r.lines.append("Last tackle — they put up a bomb and your fullback takes it cleanly.")
-		r.restart_x = clamp(x + randf_range(10.0, 25.0) * METRE, Field.FIELD_LEFT + 60.0, Field.FIELD_RIGHT - 60.0)
-		return r
+		land = clamp(x + randf_range(12.0, 26.0) * METRE,
+					 Field.FIELD_LEFT + 70.0, Field.FIELD_RIGHT - 70.0)
+		beats.append({
+			"text": "Last tackle — a bomb, and your fullback takes it cleanly.",
+			"ball_x": land, "ball_y": y, "kind": "kick"
+		})
+	else:
+		land = clamp(x + randf_range(26.0, 46.0) * METRE,
+					 Field.FIELD_LEFT + 70.0, Field.FIELD_RIGHT - 70.0)
+		beats.append({
+			"text": "Last tackle — they kick long downfield.",
+			"ball_x": land, "ball_y": y, "kind": "kick"
+		})
+	return beats
 
-	r.lines.append("Last tackle — they kick long downfield.")
-	r.restart_x = clamp(x + randf_range(25.0, 45.0) * METRE, Field.FIELD_LEFT + 60.0, Field.FIELD_RIGHT - 60.0)
-	return r
 
-
-static func _metres_out(x: float) -> int:
-	# Distance from the left try line, rounded to the nearest 5
+static func _metres(x: float) -> int:
 	var m: int = int((x - Field.FIELD_LEFT) / METRE)
 	return int(round(float(m) / 5.0) * 5)

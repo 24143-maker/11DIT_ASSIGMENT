@@ -47,6 +47,7 @@ var _stuck_timer: float = 0.0
 var _last_pos: Vector2 = Vector2.ZERO
 var _marker_mask: int = -1              # collision mask stored while acting as marker
 var _marker_anchor: Vector2 = Vector2.ZERO   # frozen ruck spot the marker holds
+var _marker_settled: bool = false
 
 const GRACE_TIME: float = 0.20
 const MARKER_OFFSET_PX: float = 16.0
@@ -66,11 +67,18 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# Narrated set is playing: tweens own our position
+	if GameState.phase == GameState.Phase.DEAD:
+		velocity = Vector2.ZERO
+		return
+
 	# If we left RETREAT by any route, make sure collision is turned back on
 	if state != State.RETREAT and _saved_mask != -1:
 		_restore_collision()
 
 	# Same for the marker's collision
+	if state != State.MARKER:
+		_marker_settled = false
 	if state != State.MARKER and _marker_mask != -1:
 		collision_mask = _marker_mask
 		_marker_mask = -1
@@ -280,11 +288,18 @@ func _do_marker(delta: float) -> void:
 		return
 
 	# Square in front of the tackled player: same y, fixed distance ahead.
-	# Nothing can push us or them any more, so this stays exact.
 	marker_pos = Vector2(
 		marker_target.global_position.x + MARKER_OFFSET_PX,
 		marker_target.global_position.y
 	)
+
+	# Snap straight there the first frame so he is instantly in position,
+	# then track the player if they shuffle.
+	if not _marker_settled:
+		global_position = marker_pos
+		_marker_settled = true
+		return
+
 	global_position = global_position.move_toward(marker_pos, marker_move_speed * delta)
 
 
@@ -488,6 +503,7 @@ func _complete_tackle() -> void:
 		_end_chase()
 		return
 	GameState.tackled_player = ball_carrier
+	GameState.tackler = self
 	if _tackle_pos == Vector2.ZERO and ball_carrier:
 		_tackle_pos = ball_carrier.global_position
 	GameState.tackle_position = _tackle_pos

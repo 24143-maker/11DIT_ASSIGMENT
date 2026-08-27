@@ -23,6 +23,7 @@ var score: Array[int] = [0, 0]
 var phase: Phase = Phase.OPEN_PLAY
 var tackle_position: Vector2 = Vector2.ZERO   # where the ball is played from
 var tackled_player: Node2D = null             # who actually got tackled
+var tackler: Node2D = null                    # who made the tackle
 var turnover_position: Vector2 = Vector2.ZERO # where possession changed hands
 
 # true when the AI team has the ball and the human is defending

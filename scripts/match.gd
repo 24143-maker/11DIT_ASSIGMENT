@@ -40,7 +40,6 @@ var fullback_hunting: bool = false     # true while he is going for a kicked bal
 var ai_carrier: Node2D = null        # the AI's ball runner when they attack
 var ai_pass_timer: float = 0.0
 var switch_cooldown: float = 0.0
-var _pending_result = null
 var kick_chaser: Node2D = null          # the one player committed to chasing a kick
 var kick_control_delay: float = 0.0     # counts down before control switches to them
 
@@ -160,6 +159,7 @@ const RECEIVE_SHAPE: Array = [
 
 func _kickoff() -> void:
 	GameState.reset_set()
+	GameState.tackler = null
 	GameState.possession = 0
 	GameState.turnover_position = Vector2.ZERO
 	ai_carrier = null
@@ -385,8 +385,15 @@ func _on_tackle_made(tackle_number: int) -> void:
 	marker_defender = _pick_marker(ruck)
 	if marker_defender:
 		marker_defender.state = Defender.State.MARKER
-		marker_defender.marker_target = current_carrier   # follows the tackled player
+		marker_defender.marker_target = current_carrier
 		marker_defender.marker_pos = ruck + Vector2(Field.metres_to_pixels(MARKER_METRES), 0)
+		# Put him there immediately so he is visible the moment the ruck forms
+		marker_defender.global_position = Vector2(
+			ruck.x + Field.metres_to_pixels(MARKER_METRES), ruck.y
+		)
+		print("MARKER: ", marker_defender.name, " at ", marker_defender.global_position)
+	else:
+		print("MARKER: none picked!")
 
 	# Everyone else retreats and holds, spread across their own slots
 	var new_line_x: float = min(
@@ -991,65 +998,155 @@ func _on_turnover() -> void:
 	_run_opposition_set(spot)
 
 
-# Freeze play, tell the story of their set, then hand the ball back
+# The opposition's set is decided up front, then played out on the field
+# one tackle at a time. Nothing is live, so it can't go wrong.
+var _beats: Array = []
+var _beat_i: int = 0
+var _beat_busy: bool = false
+
 func _run_opposition_set(spot: Vector2) -> void:
 	GameState.phase = GameState.Phase.DEAD
 	clock_running = false
 
-	var result = OppositionSet.simulate(spot.x, GameState.AWAY_SHORT)
+	_beats = OppositionSet.simulate(spot.x, GameState.AWAY_SHORT)
+	_beat_i = 0
+	_beat_busy = false
+
+	# Put both teams into a sensible shape for the first beat
+	_place_for_beat(_beats[0], true)
 
 	var hud := _find_hud()
-	if hud == null:
-		# No HUD to narrate with — just apply the outcome
-		_finish_opposition_set(result)
+	if hud:
+		if not hud.story_advance.is_connected(_on_beat_advance):
+			hud.story_advance.connect(_on_beat_advance)
+		hud.show_beat(_beats[0]["text"], 1, _beats.size())
+
+
+# Space pressed — animate to the next beat
+func _on_beat_advance() -> void:
+	if _beat_busy:
+		return
+	_beat_i += 1
+
+	if _beat_i >= _beats.size():
+		_finish_opposition_set()
 		return
 
-	if not hud.story_finished.is_connected(_on_story_done):
-		hud.story_finished.connect(_on_story_done)
-	_pending_result = result
-	hud.play_story(result.lines)
+	_beat_busy = true
+	var beat: Dictionary = _beats[_beat_i]
+	await _place_for_beat(beat, false)
+	_beat_busy = false
+
+	var hud := _find_hud()
+	if hud:
+		hud.show_beat(beat["text"], _beat_i + 1, _beats.size())
 
 
-func _on_story_done() -> void:
-	_finish_opposition_set(_pending_result)
-	_pending_result = null
+# Move everyone to where this beat says they should be.
+# `instant` snaps; otherwise it glides so you can see the movement.
+func _place_for_beat(beat: Dictionary, instant: bool) -> void:
+	var bx: float = beat["ball_x"]
+	var by: float = beat["ball_y"]
+
+	var defs: Array = get_tree().get_nodes_in_group("defenders")
+	var atk: Array = get_tree().get_nodes_in_group("attackers")
+	var ball: Ball = get_ball()
+
+	# THEM: runner on the ball, support spread across the field just behind
+	var targets: Dictionary = {}
+	var sup: int = max(defs.size() - 1, 1)
+	var sup_gap: float = Field.FIELD_BOTTOM / float(sup + 1)
+	var si: int = 0
+	for i in range(defs.size()):
+		var d = defs[i]
+		if i == 0:
+			targets[d] = Vector2(bx, by)
+			continue
+		# They attack toward -x, so support sits at a LARGER x (behind the ball)
+		targets[d] = Vector2(
+			clamp(bx + 34.0 + float(si % 3) * 16.0, Field.FIELD_LEFT, Field.FIELD_RIGHT),
+			clamp(sup_gap * float(si + 1), 40.0, Field.FIELD_BOTTOM - 40.0)
+		)
+		si += 1
+
+	# YOU: a flat line 10m in front, evenly spread, fullback deeper still
+	var line_x: float = clamp(bx - Field.metres_to_pixels(RETREAT_METRES),
+							  Field.FIELD_LEFT + 10.0, Field.FIELD_RIGHT)
+	var line_men: int = max(atk.size() - 1, 1)
+	var gap: float = Field.FIELD_BOTTOM / float(line_men + 1)
+	for i in range(atk.size()):
+		var a = atk[i]
+		a.is_user_controlled = false
+		a.velocity = Vector2.ZERO
+		if i == atk.size() - 1:
+			targets[a] = Vector2(
+				clamp(line_x - 130.0, Field.FIELD_LEFT + 10.0, Field.FIELD_RIGHT),
+				clamp(by, 60.0, Field.FIELD_BOTTOM - 60.0)
+			)
+		else:
+			targets[a] = Vector2(line_x, gap * float(i + 1))
+
+	if instant:
+		for n in targets:
+			n.global_position = targets[n]
+			n.velocity = Vector2.ZERO
+		if ball and defs.size() > 0:
+			ball.give_to(defs[0])
+		return
+
+	# Glide everyone into place together
+	var tw := create_tween()
+	tw.set_parallel(true)
+	for n in targets:
+		n.velocity = Vector2.ZERO
+		tw.tween_property(n, "global_position", targets[n], 0.55) \
+		  .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	await tw.finished
+
+	if ball and defs.size() > 0:
+		ball.give_to(defs[0])
 
 
-func _finish_opposition_set(result) -> void:
+func _finish_opposition_set() -> void:
+	var hud := _find_hud()
+	if hud:
+		hud.hide_beat()
+
+	var last: Dictionary = _beats[_beats.size() - 1] if _beats.size() > 0 else {}
+	_beats = []
+
 	clock_running = true
 	GameState.possession = 0
 	GameState.reset_set()
 	GameState.turnover_position = Vector2.ZERO
 	GameState.phase = GameState.Phase.OPEN_PLAY
 
-	if result == null:
-		_start_player_set(Field.centre())
-		return
-
-	if result.they_scored:
+	if last.get("kind", "") == "try":
 		GameState.score[1] += 4
 		GameState.score_changed.emit()
 		event_message.emit("THEY SCORE")
 		_kickoff()
 		return
 
-	var spot := Vector2(
-		clamp(result.restart_x, Field.FIELD_LEFT + 40.0, Field.FIELD_RIGHT - 40.0),
+	var restart := Vector2(
+		clamp(float(last.get("ball_x", Field.centre().x)),
+			  Field.FIELD_LEFT + 40.0, Field.FIELD_RIGHT - 40.0),
 		Field.FIELD_BOTTOM * 0.5
 	)
 	event_message.emit("OUR BALL")
-	_start_player_set(spot)
+	_start_player_set(restart)
 
 
 func _find_hud() -> Node:
 	for c in get_children():
-		if c is CanvasLayer and c.has_method("play_story"):
+		if c is CanvasLayer and c.has_method("show_beat"):
 			return c
 	return null
 
 
 func _start_player_set(spot: Vector2) -> void:
 	ai_carrier = null
+	GameState.tackler = null
 	for a in get_tree().get_nodes_in_group("attackers"):
 		a.def_is_fullback = false
 	_restore_defensive_roles(spot.x + Field.metres_to_pixels(RETREAT_METRES))
@@ -1228,18 +1325,24 @@ func _advance_defensive_line(delta: float) -> void:
 # Prefer a defender already IN FRONT of the ruck, so it never has to
 # travel through the tackled player to take up its spot.
 func _pick_marker(ruck: Vector2) -> Defender:
+	# The player who made the tackle stands as marker — he's already there.
+	var t = GameState.tackler
+	if t != null and is_instance_valid(t) and t.is_in_group("defenders") and not t.is_fullback:
+		return t
+
+	# Otherwise the nearest defender who is already in front of the ruck,
+	# so he never has to walk through the tackled player to take his spot.
 	var best: Defender = null
 	var best_dist: float = INF
 	for d in get_tree().get_nodes_in_group("defenders"):
 		if d.is_fullback:
-			continue                      # the fullback never marks the ruck
+			continue
 		if d.global_position.x < ruck.x:
-			continue                      # this one is behind the ruck, skip it
+			continue
 		var dist: float = d.global_position.distance_to(ruck)
 		if dist < best_dist:
 			best_dist = dist
 			best = d
-	# Nobody in front? Fall back to the nearest defender of any kind.
 	if best == null:
 		best = _closest_defender_to(ruck)
 	return best

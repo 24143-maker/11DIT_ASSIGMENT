@@ -2,7 +2,9 @@
 
 [ext_resource type="Script" uid="uid://b8bsyh75scsip" path="res://scripts/match.gd" id="1_klj7n"]
 [ext_resource type="Texture2D" uid="uid://ce2f1jd2hyhlo" path="res://field_rugby_rivalry1.png" id="2_o7pxg"]
+[ext_resource type="Texture2D" uid="uid://4dn8y7btub01" path="res://goal_posts_left.png" id="2_s2axa"]
 [ext_resource type="PackedScene" uid="uid://b3nwy8eq4sgel" path="res://scenes/entities/footballer.tscn" id="3_h1ndw"]
+[ext_resource type="Texture2D" uid="uid://dwx30sbja7gd4" path="res://goal_posts_right.png" id="3_iixe4"]
 [ext_resource type="Script" uid="uid://c14kbv47uhfmq" path="res://scripts/field_lines.gd" id="3_o7pxg"]
 [ext_resource type="PackedScene" uid="uid://18b0mg85u1je" path="res://scenes/entities/ball.tscn" id="5_86swp"]
 [ext_resource type="Script" uid="uid://ba5u347a7p6hy" path="res://scripts/hud.gd" id="5_o7pxg"]
@@ -15,6 +17,14 @@ size = Vector2(16, 544)
 
 [node name="Match" type="Node2D" unique_id=661084551]
 script = ExtResource("1_klj7n")
+
+[node name="Left posts" type="Sprite2D" parent="." unique_id=1913313530]
+texture = ExtResource("2_s2axa")
+
+[node name="Right posts" type="Sprite2D" parent="." unique_id=1236509538]
+position = Vector2(894, 257)
+scale = Vector2(1.0892857, 1)
+texture = ExtResource("3_iixe4")
 
 [node name="field" type="Sprite2D" parent="." unique_id=415785008]
 z_index = -10

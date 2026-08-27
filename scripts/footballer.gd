@@ -142,6 +142,12 @@ func _physics_process(delta: float) -> void:
 	# The arrow always sits above whoever the human is driving
 	if sel_arrow:
 		sel_arrow.visible = is_user_controlled
+
+	# Narrated set is playing: positions are driven by tweens, so this
+	# script must not move us or it will fight the animation.
+	if GameState.phase == GameState.Phase.DEAD:
+		velocity = Vector2.ZERO
+		return
 	# Stamina ticks for EVERY player in EVERY state, so standing in the
 	# ruck or jogging in support both recover you.
 	_update_stamina(delta)
