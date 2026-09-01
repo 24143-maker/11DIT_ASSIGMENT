@@ -71,6 +71,7 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_ball_watchdog()
 	_handle_player_switch(delta)
 	_keep_fullback_deep()
 	_update_fullback_hunt()
@@ -517,6 +518,27 @@ func _set_human_defence(ruck: Vector2, with_marker: bool) -> void:
 		slot += 1
 
 
+# If the ball ends up with nobody, not in flight and not loose, it has been
+# orphaned by a phase change. Put it back in the current carrier's hands.
+func _ball_watchdog() -> void:
+	var ball: Ball = get_ball()
+	if ball == null:
+		return
+
+	ball.visible = true
+
+	if ball.carrier != null or ball.in_flight or ball.is_loose:
+		return
+	if GameState.phase == GameState.Phase.DEAD:
+		return      # narrated set is running, it will be handed over
+
+	var owner_node: Node2D = current_carrier
+	if owner_node == null or not is_instance_valid(owner_node):
+		owner_node = _first_attacker()
+	if owner_node:
+		ball.give_to(owner_node)
+
+
 # ---------- SWITCHING PLAYERS ON DEFENCE ----------
 
 # While defending, tapping W or S moves control up or down the line.
@@ -653,6 +675,10 @@ func _keep_fullback_deep() -> void:
 		return                      # taking / just took the kick-off
 	if fullback.state == Defender.State.CHASE_BALL:
 		return
+	if fullback.state == Defender.State.MARKER:
+		return                      # he made the tackle, he's the marker
+	if GameState.phase == GameState.Phase.RUCK:
+		return                      # leave everyone alone during the ruck
 
 	if fullback.state != Defender.State.FULLBACK:
 		fullback.state = Defender.State.FULLBACK
@@ -1034,42 +1060,50 @@ func _on_beat_advance() -> void:
 
 	_beat_busy = true
 	var beat: Dictionary = _beats[_beat_i]
-	await _place_for_beat(beat, false)
-	_beat_busy = false
 
+	# Show what is about to happen, then play it out
 	var hud := _find_hud()
 	if hud:
 		hud.show_beat(beat["text"], _beat_i + 1, _beats.size())
 
+	await _animate_beat(beat)
+	_beat_busy = false
 
-# Move everyone to where this beat says they should be.
-# `instant` snaps; otherwise it glides so you can see the movement.
-func _place_for_beat(beat: Dictionary, instant: bool) -> void:
+
+# Set both teams up for the very first beat.
+func _place_for_beat(beat: Dictionary, _instant: bool) -> void:
 	var bx: float = beat["ball_x"]
 	var by: float = beat["ball_y"]
-
 	var defs: Array = get_tree().get_nodes_in_group("defenders")
 	var atk: Array = get_tree().get_nodes_in_group("attackers")
-	var ball: Ball = get_ball()
 
-	# THEM: runner on the ball, support spread across the field just behind
-	var targets: Dictionary = {}
-	var sup: int = max(defs.size() - 1, 1)
-	var sup_gap: float = Field.FIELD_BOTTOM / float(sup + 1)
-	var si: int = 0
 	for i in range(defs.size()):
 		var d = defs[i]
+		d.velocity = Vector2.ZERO
 		if i == 0:
-			targets[d] = Vector2(bx, by)
-			continue
-		# They attack toward -x, so support sits at a LARGER x (behind the ball)
-		targets[d] = Vector2(
-			clamp(bx + 34.0 + float(si % 3) * 16.0, Field.FIELD_LEFT, Field.FIELD_RIGHT),
-			clamp(sup_gap * float(si + 1), 40.0, Field.FIELD_BOTTOM - 40.0)
-		)
-		si += 1
+			d.global_position = Vector2(bx, by)
+		else:
+			d.global_position = _support_spot(bx, by, i, defs.size())
 
-	# YOU: a flat line 10m in front, evenly spread, fullback deeper still
+	_snap_defensive_line(bx, by, atk, -1)
+
+	var ball: Ball = get_ball()
+	if ball and defs.size() > 0:
+		ball.give_to(defs[0])
+
+
+# Where an AI support runner stands, spread across the field behind the ball
+func _support_spot(bx: float, by: float, i: int, total: int) -> Vector2:
+	var sup: int = max(total - 1, 1)
+	var gap: float = Field.FIELD_BOTTOM / float(sup + 1)
+	return Vector2(
+		clamp(bx + 34.0 + float((i - 1) % 3) * 16.0, Field.FIELD_LEFT, Field.FIELD_RIGHT),
+		clamp(gap * float(i), 40.0, Field.FIELD_BOTTOM - 40.0)
+	)
+
+
+# Put your defensive line in place. marker_i is the index of the marker, or -1.
+func _snap_defensive_line(bx: float, by: float, atk: Array, marker_i: int) -> void:
 	var line_x: float = clamp(bx - Field.metres_to_pixels(RETREAT_METRES),
 							  Field.FIELD_LEFT + 10.0, Field.FIELD_RIGHT)
 	var line_men: int = max(atk.size() - 1, 1)
@@ -1079,31 +1113,60 @@ func _place_for_beat(beat: Dictionary, instant: bool) -> void:
 		a.is_user_controlled = false
 		a.velocity = Vector2.ZERO
 		if i == atk.size() - 1:
-			targets[a] = Vector2(
+			a.global_position = Vector2(
 				clamp(line_x - 130.0, Field.FIELD_LEFT + 10.0, Field.FIELD_RIGHT),
-				clamp(by, 60.0, Field.FIELD_BOTTOM - 60.0)
-			)
+				clamp(by, 60.0, Field.FIELD_BOTTOM - 60.0))
+		elif i == marker_i:
+			a.global_position = Vector2(bx - 16.0, by)
 		else:
-			targets[a] = Vector2(line_x, gap * float(i + 1))
+			a.global_position = Vector2(line_x, gap * float(i + 1))
 
-	if instant:
-		for n in targets:
-			n.global_position = targets[n]
-			n.velocity = Vector2.ZERO
-		if ball and defs.size() > 0:
-			ball.give_to(defs[0])
+
+# Glide everyone from where they are to where this beat puts them.
+func _animate_beat(beat: Dictionary) -> void:
+	var bx: float = beat["ball_x"]
+	var by: float = beat["ball_y"]
+	var defs: Array = get_tree().get_nodes_in_group("defenders")
+	var atk: Array = get_tree().get_nodes_in_group("attackers")
+	var ball: Ball = get_ball()
+	if defs.is_empty():
 		return
 
-	# Glide everyone into place together
+	# Ball travels with the runner
+	if ball:
+		ball.give_to(defs[0])
+
+	var dist: float = defs[0].global_position.distance_to(Vector2(bx, by))
+	var dur: float = clamp(dist / 130.0, 0.7, 2.6)
+
+	var line_x: float = clamp(bx - Field.metres_to_pixels(RETREAT_METRES),
+							  Field.FIELD_LEFT + 10.0, Field.FIELD_RIGHT)
+	var line_men: int = max(atk.size() - 1, 1)
+	var gap: float = Field.FIELD_BOTTOM / float(line_men + 1)
+
 	var tw := create_tween()
 	tw.set_parallel(true)
-	for n in targets:
-		n.velocity = Vector2.ZERO
-		tw.tween_property(n, "global_position", targets[n], 0.55) \
-		  .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	await tw.finished
 
-	if ball and defs.size() > 0:
+	tw.tween_property(defs[0], "global_position", Vector2(bx, by), dur) \
+	  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	for i in range(1, defs.size()):
+		tw.tween_property(defs[i], "global_position",
+			_support_spot(bx, by, i, defs.size()), dur * 0.92) \
+			.set_trans(Tween.TRANS_SINE)
+
+	for i in range(atk.size()):
+		var a = atk[i]
+		a.is_user_controlled = false
+		var to: Vector2
+		if i == atk.size() - 1:
+			to = Vector2(clamp(line_x - 130.0, Field.FIELD_LEFT + 10.0, Field.FIELD_RIGHT),
+						 clamp(by, 60.0, Field.FIELD_BOTTOM - 60.0))
+		else:
+			to = Vector2(line_x, gap * float(i + 1))
+		tw.tween_property(a, "global_position", to, dur * 0.92).set_trans(Tween.TRANS_SINE)
+
+	await tw.finished
+	if ball:
 		ball.give_to(defs[0])
 
 
@@ -1128,13 +1191,22 @@ func _finish_opposition_set() -> void:
 		_kickoff()
 		return
 
+	# Restart from the exact spot the set ended, only pulled in far enough
+	# to keep the players on the field.
+	var end_x: float = float(last.get("ball_x", Field.centre().x))
+	var end_y: float = float(last.get("ball_y", Field.FIELD_BOTTOM * 0.5))
 	var restart := Vector2(
-		clamp(float(last.get("ball_x", Field.centre().x)),
-			  Field.FIELD_LEFT + 40.0, Field.FIELD_RIGHT - 40.0),
-		Field.FIELD_BOTTOM * 0.5
+		clamp(end_x, Field.FIELD_LEFT + 18.0, Field.FIELD_RIGHT - 18.0),
+		clamp(end_y, 70.0, Field.FIELD_BOTTOM - 70.0)
 	)
 	event_message.emit("OUR BALL")
 	_start_player_set(restart)
+
+	# Belt and braces: the ball must be in someone's hands now
+	var ball: Ball = get_ball()
+	var first = _first_attacker()
+	if ball and first and ball.carrier == null:
+		ball.give_to(first)
 
 
 func _find_hud() -> Node:
@@ -1327,7 +1399,7 @@ func _advance_defensive_line(delta: float) -> void:
 func _pick_marker(ruck: Vector2) -> Defender:
 	# The player who made the tackle stands as marker — he's already there.
 	var t = GameState.tackler
-	if t != null and is_instance_valid(t) and t.is_in_group("defenders") and not t.is_fullback:
+	if t != null and is_instance_valid(t) and t.is_in_group("defenders"):
 		return t
 
 	# Otherwise the nearest defender who is already in front of the ruck,

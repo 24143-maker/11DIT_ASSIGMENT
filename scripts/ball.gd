@@ -46,6 +46,8 @@ func _ready() -> void:
 	add_to_group("ball")
 	collision_layer = 8
 	collision_mask = 0      # catching and pickups are distance-based
+	z_index = 12            # always drawn above the players
+	visible = true
 
 
 func _physics_process(delta: float) -> void:
@@ -216,6 +218,8 @@ func _nearest_anyone(radius: float) -> Node2D:
 # ---------- LAUNCHERS ----------
 
 func give_to(who: Node2D) -> void:
+	visible = true
+	z_index = 12
 	carrier = who
 	in_flight = false
 	is_loose = false

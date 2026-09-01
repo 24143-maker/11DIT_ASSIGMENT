@@ -1,17 +1,84 @@
 [gd_scene format=3 uid="uid://b3nwy8eq4sgel"]
 
 [ext_resource type="Script" uid="uid://5qr5nui2hn6c" path="res://scripts/footballer.gd" id="1_lr53s"]
-[ext_resource type="Texture2D" uid="uid://b2oxjslunyyq7" path="res://icon_blue.svg" id="2_e8ag3"]
+[ext_resource type="Texture2D" uid="uid://c1yl7xg0ber4j" path="res://art/players/player_hpc_run_1.png" id="2_lr53s"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_tmk2x"]
+atlas = ExtResource("2_lr53s")
+region = Rect2(0, 0, 26, 26)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_epiwv"]
+atlas = ExtResource("2_lr53s")
+region = Rect2(26, 0, 26, 26)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_rmcul"]
+atlas = ExtResource("2_lr53s")
+region = Rect2(52, 0, 26, 26)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_om6l6"]
+atlas = ExtResource("2_lr53s")
+region = Rect2(78, 0, 26, 26)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_qh08p"]
+atlas = ExtResource("2_lr53s")
+region = Rect2(104, 0, 26, 26)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_5mjm7"]
+atlas = ExtResource("2_lr53s")
+region = Rect2(130, 0, 26, 26)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_05n6k"]
+atlas = ExtResource("2_lr53s")
+region = Rect2(156, 0, 26, 26)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_42xw4"]
+atlas = ExtResource("2_lr53s")
+region = Rect2(182, 0, 26, 26)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_cd33c"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_tmk2x")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_epiwv")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_rmcul")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_om6l6")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_qh08p")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_5mjm7")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_05n6k")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_42xw4")
+}],
+"loop": 1,
+"name": &"run",
+"speed": 14.0
+}]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_08t41"]
-radius = 8.0
+radius = 15.0
 
 [node name="Footballer" type="CharacterBody2D" unique_id=886370576]
 script = ExtResource("1_lr53s")
 
-[node name="Sprite2D" type="Sprite2D" parent="." unique_id=934102241]
-scale = Vector2(0.15, 0.15)
-texture = ExtResource("2_e8ag3")
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=226209727]
+scale = Vector2(1.4, 1.4)
+sprite_frames = SubResource("SpriteFrames_cd33c")
+animation = &"run"
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1197853573]
+position = Vector2(0, 5.9604645e-08)
+scale = Vector2(1.4, 1.4)
 shape = SubResource("CircleShape2D_08t41")

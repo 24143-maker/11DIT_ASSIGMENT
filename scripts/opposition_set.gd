@@ -13,7 +13,7 @@ static func simulate(start_x: float, team: String) -> Array:
 	var y: float = Field.FIELD_BOTTOM * 0.5
 
 	beats.append({
-		"text": "%s take over on the %dm." % [team, _metres(x)],
+		"text": "%s take over %dm out." % [team, _metres(x)],
 		"ball_x": x, "ball_y": y, "kind": "start"
 	})
 

@@ -67,6 +67,8 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_update_sprite()
+
 	# Narrated set is playing: tweens own our position
 	if GameState.phase == GameState.Phase.DEAD:
 		velocity = Vector2.ZERO
@@ -370,10 +372,17 @@ func _do_fullback(delta: float) -> void:
 	var target := Vector2(deep_x, lerp(Field.FIELD_BOTTOM * 0.5, carrier_pos.y, 0.7))
 	target.y = clamp(target.y, 30.0, Field.FIELD_BOTTOM - 30.0)
 
-	# In front of the line? Get back immediately.
-	if global_position.x < line_x_now + 20.0:
+	# In front of the line? Get back — but only if there is actually room.
+	# Against our own try line there is nowhere to go, and pushing anyway
+	# made him jitter back and forth against the clamp.
+	var room: bool = (line_x_now + 40.0) < (Field.FIELD_RIGHT - 12.0)
+	if room and global_position.x < line_x_now + 20.0:
 		velocity = Vector2(fullback_speed, (target.y - global_position.y) * 0.6)
 		return
+
+	if not room:
+		# Squeezed against the line: just hold the goal line and track sideways
+		target.x = Field.FIELD_RIGHT - 14.0
 
 	velocity = _avoid((target - global_position).limit_length(base_speed), ball_carrier)
 
@@ -509,3 +518,21 @@ func _complete_tackle() -> void:
 	GameState.tackle_position = _tackle_pos
 	GameState.phase = GameState.Phase.RUCK
 	GameState.register_tackle()
+
+
+# Turn the sprite to face the way we're running, and animate while moving.
+func _update_sprite() -> void:
+	var anim = get_node_or_null("AnimatedSprite2D")
+	if anim != null:
+		if velocity.length() > 8.0:
+			anim.rotation = velocity.angle()
+			if not anim.is_playing():
+				anim.play("run")
+		else:
+			anim.stop()
+			anim.frame = 0
+		return
+
+	var spr = get_node_or_null("Sprite2D")
+	if spr != null and velocity.length() > 8.0:
+		spr.rotation = velocity.angle()

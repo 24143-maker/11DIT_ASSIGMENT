@@ -173,32 +173,32 @@ func _make_label(pos: Vector2, size: int) -> Label:
 func _build_story_panel() -> void:
 	# A slim banner along the bottom, so the field stays visible
 	story_panel = ColorRect.new()
-	story_panel.position = Vector2(40, 286)
-	story_panel.size = Vector2(560, 56)
+	story_panel.position = Vector2(20, 246)
+	story_panel.size = Vector2(600, 100)
 	story_panel.color = Color(0.06, 0.06, 0.08, 0.9)
 	add_child(story_panel)
 
 	story_bg = ColorRect.new()
-	story_bg.position = Vector2(40, 286)
-	story_bg.size = Vector2(560, 2)
+	story_bg.position = Vector2(20, 246)
+	story_bg.size = Vector2(600, 3)
 	story_bg.color = Color(0.85, 0.2, 0.18, 0.95)
 	add_child(story_bg)
 
 	story_text = Label.new()
-	story_text.position = Vector2(52, 294)
-	story_text.size = Vector2(536, 30)
+	story_text.position = Vector2(36, 258)
+	story_text.size = Vector2(568, 62)
 	story_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	story_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	story_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	story_text.add_theme_font_size_override("font_size", 15)
+	story_text.add_theme_font_size_override("font_size", 24)
 	story_text.add_theme_color_override("font_color", Color.WHITE)
 	add_child(story_text)
 
 	story_hint = Label.new()
-	story_hint.position = Vector2(52, 322)
-	story_hint.size = Vector2(536, 16)
+	story_hint.position = Vector2(36, 322)
+	story_hint.size = Vector2(568, 18)
 	story_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	story_hint.add_theme_font_size_override("font_size", 10)
+	story_hint.add_theme_font_size_override("font_size", 13)
 	story_hint.add_theme_color_override("font_color", Color(0.72, 0.75, 0.78))
 	add_child(story_hint)
 

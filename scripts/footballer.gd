@@ -114,6 +114,25 @@ func _build_arrow() -> void:
 
 # ---------- MOVEMENT ----------
 
+# Turn the sprite to face the way we're running, and animate while moving.
+# Works with either an AnimatedSprite2D or a plain Sprite2D.
+func _update_sprite() -> void:
+	var anim = get_node_or_null("AnimatedSprite2D")
+	if anim != null:
+		if velocity.length() > 8.0:
+			anim.rotation = velocity.angle()
+			if not anim.is_playing():
+				anim.play("run")
+		else:
+			anim.stop()
+			anim.frame = 0
+		return
+
+	var spr = get_node_or_null("Sprite2D")
+	if spr != null and velocity.length() > 8.0:
+		spr.rotation = velocity.angle()
+
+
 func _build_select_arrow() -> void:
 	sel_arrow = Node2D.new()
 	sel_arrow.z_index = 25
@@ -139,6 +158,8 @@ func _build_select_arrow() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_update_sprite()
+
 	# The arrow always sits above whoever the human is driving
 	if sel_arrow:
 		sel_arrow.visible = is_user_controlled
