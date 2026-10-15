@@ -1,13 +1,14 @@
 [gd_scene format=3 uid="uid://b743blvwst0tc"]
 
 [ext_resource type="Script" uid="uid://b8bsyh75scsip" path="res://scripts/match.gd" id="1_klj7n"]
-[ext_resource type="Texture2D" uid="uid://ce2f1jd2hyhlo" path="res://field_rugby_rivalry1.png" id="2_o7pxg"]
-[ext_resource type="Texture2D" uid="uid://4dn8y7btub01" path="res://goal_posts_left.png" id="2_s2axa"]
+[ext_resource type="Texture2D" uid="uid://ce2f1jd2hyhlo" path="res://art/field/field.png" id="2_o7pxg"]
+[ext_resource type="Texture2D" uid="uid://4dn8y7btub01" path="res://art/props/goal_posts_left.png" id="2_s2axa"]
 [ext_resource type="PackedScene" uid="uid://b3nwy8eq4sgel" path="res://scenes/entities/footballer.tscn" id="3_h1ndw"]
-[ext_resource type="Texture2D" uid="uid://dwx30sbja7gd4" path="res://goal_posts_right.png" id="3_iixe4"]
+[ext_resource type="Texture2D" uid="uid://dwx30sbja7gd4" path="res://art/props/goal_posts_right.png" id="3_iixe4"]
 [ext_resource type="Script" uid="uid://c14kbv47uhfmq" path="res://scripts/field_lines.gd" id="3_o7pxg"]
 [ext_resource type="PackedScene" uid="uid://18b0mg85u1je" path="res://scenes/entities/ball.tscn" id="5_86swp"]
 [ext_resource type="Script" uid="uid://ba5u347a7p6hy" path="res://scripts/hud.gd" id="5_o7pxg"]
+[ext_resource type="Script" path="res://scripts/stadium.gd" id="9_stadm"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_nudob"]
 size = Vector2(896, 16)
@@ -18,12 +19,16 @@ size = Vector2(16, 544)
 [node name="Match" type="Node2D" unique_id=661084551]
 script = ExtResource("1_klj7n")
 
+[node name="Stadium" type="Node2D" parent="."]
+z_index = -20
+script = ExtResource("9_stadm")
+
 [node name="Left posts" type="Sprite2D" parent="." unique_id=1913313530]
+position = Vector2(6, 272)
 texture = ExtResource("2_s2axa")
 
 [node name="Right posts" type="Sprite2D" parent="." unique_id=1236509538]
-position = Vector2(894, 257)
-scale = Vector2(1.0892857, 1)
+position = Vector2(890, 272)
 texture = ExtResource("3_iixe4")
 
 [node name="field" type="Sprite2D" parent="." unique_id=415785008]
@@ -73,12 +78,13 @@ stamina_regen = null
 tired_speed_mult = null
 
 [node name="Camera2D" type="Camera2D" parent="Footballer" unique_id=1388044688]
-zoom = Vector2(0.65, 0.65)
-limit_left = 0
-limit_top = 0
-limit_right = 898
-limit_bottom = 544
+zoom = Vector2(0.587, 0.587)
+limit_left = -96
+limit_top = -96
+limit_right = 992
+limit_bottom = 640
 position_smoothing_enabled = true
+position_smoothing_speed = 4.0
 
 [node name="Footballer2" parent="." unique_id=102084955 groups=["attackers"] instance=ExtResource("3_h1ndw")]
 position = Vector2(62, 303)

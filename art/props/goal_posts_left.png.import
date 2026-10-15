@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cijptr2xqew7n"
-path="res://.godot/imported/rugby_ball.png-d0d1c7bf1d8090e8349a68ba4a620d59.ctex"
+uid="uid://4dn8y7btub01"
+path="res://.godot/imported/goal_posts_left.png-6fe7253881c362ab0155576fb697ed00.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://rugby_ball.png"
-dest_files=["res://.godot/imported/rugby_ball.png-d0d1c7bf1d8090e8349a68ba4a620d59.ctex"]
+source_file="res://art/props/goal_posts_left.png"
+dest_files=["res://.godot/imported/goal_posts_left.png-6fe7253881c362ab0155576fb697ed00.ctex"]
 
 [params]
 

@@ -25,6 +25,11 @@ var tackle_label: Label
 var tackle_cell: ColorRect
 var tackle_edge: ColorRect
 var event_label: Label
+var event_band: ColorRect
+var event_edge_top: ColorRect
+var event_edge_bot: ColorRect
+var event_sub: Label
+var _event_tween: Tween
 var name_label: Label
 
 var kick_bar: ProgressBar
@@ -33,7 +38,6 @@ var kick_label: Label
 var stam_bg: ColorRect
 var stam_bar: ColorRect
 
-var _event_timer: float = 0.0
 
 # Narrated opposition set
 var story_bg: ColorRect
@@ -47,8 +51,7 @@ signal story_advance()
 func _ready() -> void:
 	_build_scoreboard()
 
-	event_label = _make_label(Vector2(200, 140), 34)
-	event_label.visible = false
+	_build_event_banner()
 
 	name_label = _make_label(Vector2(16, 310), 16)
 
@@ -238,12 +241,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	_update_stamina()
-	if _event_timer > 0.0:
-		_event_timer -= delta
-		if _event_timer <= 0.0:
-			event_label.visible = false
 
 
 func _refresh() -> void:
@@ -277,10 +276,147 @@ func _on_clock_updated(seconds: float, half: int) -> void:
 	half_label.text = "1ST HALF" if half == 1 else "2ND HALF"
 
 
+# ---------- EVENT BANNER ----------
+# A broadcast-style band across the middle: dark strip, coloured accent edges
+# that change with the kind of event, big outlined text, and a wipe-in.
+
+const BANNER_Y: float = 130.0
+const BANNER_H: float = 64.0
+
+func _build_event_banner() -> void:
+	event_band = ColorRect.new()
+	event_band.position = Vector2(0, BANNER_Y)
+	event_band.size = Vector2(640, BANNER_H)
+	event_band.color = Color(0.04, 0.04, 0.06, 0.86)
+	event_band.pivot_offset = Vector2(320, BANNER_H * 0.5)
+	add_child(event_band)
+
+	event_edge_top = ColorRect.new()
+	event_edge_top.position = Vector2(0, BANNER_Y)
+	event_edge_top.size = Vector2(640, 3)
+	event_edge_top.pivot_offset = Vector2(320, 1.5)
+	add_child(event_edge_top)
+
+	event_edge_bot = ColorRect.new()
+	event_edge_bot.position = Vector2(0, BANNER_Y + BANNER_H - 3.0)
+	event_edge_bot.size = Vector2(640, 3)
+	event_edge_bot.pivot_offset = Vector2(320, 1.5)
+	add_child(event_edge_bot)
+
+	event_label = Label.new()
+	event_label.position = Vector2(0, BANNER_Y + 8.0)
+	event_label.size = Vector2(640, 34)
+	event_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	event_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	event_label.pivot_offset = Vector2(320, 17)
+	event_label.add_theme_font_size_override("font_size", 30)
+	event_label.add_theme_color_override("font_color", Color.WHITE)
+	event_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	event_label.add_theme_constant_override("outline_size", 7)
+	add_child(event_label)
+
+	event_sub = Label.new()
+	event_sub.position = Vector2(0, BANNER_Y + 42.0)
+	event_sub.size = Vector2(640, 16)
+	event_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	event_sub.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	event_sub.add_theme_font_size_override("font_size", 11)
+	event_sub.add_theme_color_override("font_color", Color(0.72, 0.75, 0.80))
+	add_child(event_sub)
+
+	_show_event_banner(false)
+
+
+func _show_event_banner(v: bool) -> void:
+	event_band.visible = v
+	event_edge_top.visible = v
+	event_edge_bot.visible = v
+	event_label.visible = v
+	event_sub.visible = v
+
+
+# Accent colour and a short context line, chosen from the event wording
+func _event_style(text: String) -> Array:
+	var t: String = text.to_upper()
+	if t.find("TRY") >= 0 or t.find("SCORE") >= 0:
+		var who: String = GameState.AWAY_NAME if t.find("THEY") >= 0 else GameState.HOME_NAME
+		return [Color(0.20, 0.80, 0.36), who.to_upper()]
+	if t.find("HANDOVER") >= 0 or t.find("TURNOVER") >= 0 or t.find("KNOCK") >= 0:
+		return [Color(0.90, 0.26, 0.22), "POSSESSION CHANGES"]
+	if t.find("KICK OFF") >= 0:
+		return [Color(0.26, 0.60, 0.94), "%s  v  %s" % [GameState.HOME_SHORT, GameState.AWAY_SHORT]]
+	if t.find("KICK") >= 0:
+		return [Color(0.26, 0.60, 0.94), ""]
+	if t.find("HALF") >= 0 or t.find("FULL TIME") >= 0:
+		return [Color(0.96, 0.76, 0.22),
+				"%s %d   -   %s %d" % [GameState.HOME_SHORT, GameState.score[0],
+									   GameState.AWAY_SHORT, GameState.score[1]]]
+	if t.find("TACKLE") >= 0:
+		var n: int = clamp(GameState.tackle_count, 0, GameState.TACKLES_PER_SET)
+		var dots: String = ""
+		for i in range(GameState.TACKLES_PER_SET):
+			dots += "O" if i < n else "-"
+		var accent := Color(0.78, 0.80, 0.84)
+		if n >= GameState.TACKLES_PER_SET - 1:
+			accent = Color(0.96, 0.55, 0.18)      # last tackle runs hot
+		return [accent, dots]
+	return [Color(0.78, 0.80, 0.84), ""]
+
+
 func show_event(text: String) -> void:
-	event_label.text = text
-	event_label.visible = true
-	_event_timer = 1.4
+	var style: Array = _event_style(text)
+	var accent: Color = style[0]
+	var sub: String = String(style[1])
+
+	event_label.text = text.to_upper()
+	event_sub.text = sub
+	event_sub.visible = sub != ""
+	event_edge_top.color = accent
+	event_edge_bot.color = accent
+	event_label.add_theme_color_override("font_color", accent.lightened(0.55))
+
+	_show_event_banner(true)
+	event_sub.visible = sub != ""
+
+	if _event_tween and _event_tween.is_valid():
+		_event_tween.kill()
+
+	# start state
+	event_band.scale = Vector2(0.0, 1.0)
+	event_edge_top.scale = Vector2(0.0, 1.0)
+	event_edge_bot.scale = Vector2(0.0, 1.0)
+	event_label.scale = Vector2(1.25, 1.25)
+	event_label.modulate.a = 0.0
+	event_sub.modulate.a = 0.0
+
+	_event_tween = create_tween()
+	_event_tween.set_parallel(true)
+	# band wipes open from the centre
+	_event_tween.tween_property(event_band, "scale", Vector2.ONE, 0.18) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_event_tween.tween_property(event_edge_top, "scale", Vector2.ONE, 0.22) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_event_tween.tween_property(event_edge_bot, "scale", Vector2.ONE, 0.22) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	# text settles in
+	_event_tween.tween_property(event_label, "scale", Vector2.ONE, 0.26) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT).set_delay(0.06)
+	_event_tween.tween_property(event_label, "modulate:a", 1.0, 0.16).set_delay(0.06)
+	_event_tween.tween_property(event_sub, "modulate:a", 1.0, 0.18).set_delay(0.16)
+
+	# hold, then fade the whole thing out
+	_event_tween.set_parallel(false)
+	_event_tween.tween_interval(1.15)
+	_event_tween.set_parallel(true)
+	_event_tween.tween_property(event_label, "modulate:a", 0.0, 0.28)
+	_event_tween.tween_property(event_sub, "modulate:a", 0.0, 0.28)
+	_event_tween.tween_property(event_band, "scale", Vector2(1.0, 0.0), 0.28) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	_event_tween.tween_property(event_edge_top, "scale", Vector2(0.0, 1.0), 0.28)
+	_event_tween.tween_property(event_edge_bot, "scale", Vector2(0.0, 1.0), 0.28)
+	_event_tween.set_parallel(false)
+	_event_tween.tween_callback(func(): _show_event_banner(false))
+
 	_refresh()
 
 

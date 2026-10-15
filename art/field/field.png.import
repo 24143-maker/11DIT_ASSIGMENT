@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://4dn8y7btub01"
-path="res://.godot/imported/goal_posts_left.png-268ed6d3fda548611020accf2cc435c0.ctex"
+uid="uid://ce2f1jd2hyhlo"
+path="res://.godot/imported/field.png-b5d6a11d2cf4f21ad35bfdf8d7bb75f7.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://goal_posts_left.png"
-dest_files=["res://.godot/imported/goal_posts_left.png-268ed6d3fda548611020accf2cc435c0.ctex"]
+source_file="res://art/field/field.png"
+dest_files=["res://.godot/imported/field.png-b5d6a11d2cf4f21ad35bfdf8d7bb75f7.ctex"]
 
 [params]
 

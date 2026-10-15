@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://b3nwy8eq4sgel"]
 
 [ext_resource type="Script" uid="uid://5qr5nui2hn6c" path="res://scripts/footballer.gd" id="1_lr53s"]
-[ext_resource type="Texture2D" uid="uid://c1yl7xg0ber4j" path="res://art/players/player_hpc_run_1.png" id="2_lr53s"]
+[ext_resource type="Texture2D" uid="uid://c1yl7xg0ber4j" path="res://art/players/player_hpc_run.png" id="2_lr53s"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_tmk2x"]
 atlas = ExtResource("2_lr53s")

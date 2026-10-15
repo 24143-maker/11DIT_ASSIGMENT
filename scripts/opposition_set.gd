@@ -69,19 +69,22 @@ static func simulate(start_x: float, team: String) -> Array:
 			})
 		return beats
 
+	# They attack toward the LEFT try line, so a kick travels to a SMALLER x.
+	# This used to add the distance instead of subtracting it, which sent the
+	# ball backwards into their own half and handed over good field position.
 	var land: float
 	if roll < 0.75:
-		land = clamp(x + randf_range(12.0, 26.0) * METRE,
-					 Field.FIELD_LEFT + 70.0, Field.FIELD_RIGHT - 70.0)
+		land = clamp(x - randf_range(12.0, 24.0) * METRE,
+					 Field.FIELD_LEFT + 60.0, Field.FIELD_RIGHT - 70.0)
 		beats.append({
-			"text": "Last tackle — a bomb, and your fullback takes it cleanly.",
+			"text": "Last tackle — a bomb hangs up, and your fullback takes it cleanly.",
 			"ball_x": land, "ball_y": y, "kind": "kick"
 		})
 	else:
-		land = clamp(x + randf_range(26.0, 46.0) * METRE,
-					 Field.FIELD_LEFT + 70.0, Field.FIELD_RIGHT - 70.0)
+		land = clamp(x - randf_range(24.0, 42.0) * METRE,
+					 Field.FIELD_LEFT + 40.0, Field.FIELD_RIGHT - 70.0)
 		beats.append({
-			"text": "Last tackle — they kick long downfield.",
+			"text": "Last tackle — they kick long and pin you deep.",
 			"ball_x": land, "ball_y": y, "kind": "kick"
 		})
 	return beats

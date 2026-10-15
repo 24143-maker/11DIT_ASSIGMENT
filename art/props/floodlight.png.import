@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dt5maxws10av2"
-path="res://.godot/imported/player_phs.png-bf9c3c5bef514e4dd0a9545a5b1acc24.ctex"
+uid="uid://cwowjn2j1tevp"
+path="res://.godot/imported/floodlight.png-6993075fe77fc21e552e3bac7ce706b0.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/players/player_phs.png"
-dest_files=["res://.godot/imported/player_phs.png-bf9c3c5bef514e4dd0a9545a5b1acc24.ctex"]
+source_file="res://art/props/floodlight.png"
+dest_files=["res://.godot/imported/floodlight.png-6993075fe77fc21e552e3bac7ce706b0.ctex"]
 
 [params]
 

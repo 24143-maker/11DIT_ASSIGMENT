@@ -392,9 +392,6 @@ func _on_tackle_made(tackle_number: int) -> void:
 		marker_defender.global_position = Vector2(
 			ruck.x + Field.metres_to_pixels(MARKER_METRES), ruck.y
 		)
-		print("MARKER: ", marker_defender.name, " at ", marker_defender.global_position)
-	else:
-		print("MARKER: none picked!")
 
 	# Everyone else retreats and holds, spread across their own slots
 	var new_line_x: float = min(
@@ -1124,6 +1121,18 @@ func _snap_defensive_line(bx: float, by: float, atk: Array, marker_i: int) -> vo
 
 # Glide everyone from where they are to where this beat puts them.
 func _animate_beat(beat: Dictionary) -> void:
+	match String(beat.get("kind", "run")):
+		"kick":
+			await _animate_kick_beat(beat)
+		"error":
+			await _animate_spill_beat(beat)
+		_:
+			await _animate_run_beat(beat)
+
+
+# A hit-up or a line break: the runner carries the ball forward and your
+# line backpedals in front of him.
+func _animate_run_beat(beat: Dictionary) -> void:
 	var bx: float = beat["ball_x"]
 	var by: float = beat["ball_y"]
 	var defs: Array = get_tree().get_nodes_in_group("defenders")
@@ -1132,7 +1141,6 @@ func _animate_beat(beat: Dictionary) -> void:
 	if defs.is_empty():
 		return
 
-	# Ball travels with the runner
 	if ball:
 		ball.give_to(defs[0])
 
@@ -1168,6 +1176,140 @@ func _animate_beat(beat: Dictionary) -> void:
 	await tw.finished
 	if ball:
 		ball.give_to(defs[0])
+
+
+# Last-tackle kick. The kicker STAYS PUT and the ball flies; one of your
+# players comes across to field it. Previously the runner was tweened to the
+# landing spot still carrying the ball, which looked exactly like they kicked
+# it and instantly got it back.
+func _animate_kick_beat(beat: Dictionary) -> void:
+	var land := Vector2(beat["ball_x"], beat["ball_y"])
+	var defs: Array = get_tree().get_nodes_in_group("defenders")
+	var atk: Array = get_tree().get_nodes_in_group("attackers")
+	var ball: Ball = get_ball()
+	if defs.is_empty() or atk.is_empty() or ball == null:
+		return
+
+	var kicker = defs[0]
+	var from: Vector2 = kicker.global_position
+
+	# Detach the ball so we can fly it ourselves. With no carrier and neither
+	# in_flight nor loose set, the ball's own physics leaves it alone.
+	ball.carrier = null
+	ball.in_flight = false
+	ball.is_loose = false
+	ball.visible = true
+	ball.global_position = from
+
+	# Whichever of your players is best placed goes and takes it.
+	var catcher = atk[0]
+	var best: float = INF
+	for a in atk:
+		var dd: float = a.global_position.distance_to(land)
+		if dd < best:
+			best = dd
+			catcher = a
+
+	var text: String = String(beat.get("text", ""))
+	var is_grubber: bool = text.findn("grubber") >= 0
+	var is_bomb: bool = text.findn("bomb") >= 0
+
+	var flight: float = clamp(from.distance_to(land) / 280.0, 0.9, 2.0)
+	if is_bomb:
+		flight = max(flight, 1.5)      # a bomb hangs
+
+	var tw := create_tween()
+	tw.set_parallel(true)
+
+	# The ball travels
+	tw.tween_property(ball, "global_position", land, flight) \
+	  .set_trans(Tween.TRANS_LINEAR)
+
+	# Your catcher gets under it, arriving just before it lands
+	tw.tween_property(catcher, "global_position", land, flight * 0.9) \
+	  .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+	# Your other players turn and come back downfield
+	var lane: float = Field.FIELD_BOTTOM / float(max(atk.size(), 1) + 1)
+	var n: int = 0
+	for a in atk:
+		a.is_user_controlled = false
+		if a == catcher:
+			continue
+		n += 1
+		tw.tween_property(a, "global_position",
+			Vector2(clamp(land.x + 90.0, Field.FIELD_LEFT + 20.0, Field.FIELD_RIGHT - 20.0),
+					clamp(lane * float(n), 50.0, Field.FIELD_BOTTOM - 50.0)),
+			flight).set_trans(Tween.TRANS_SINE)
+
+	# The kicking side chases through
+	for i in range(defs.size()):
+		var chase := Vector2(
+			lerp(defs[i].global_position.x, land.x + 40.0, 0.5),
+			clamp(60.0 + float(i) * 76.0, 45.0, Field.FIELD_BOTTOM - 45.0)
+		)
+		tw.tween_property(defs[i], "global_position", chase, flight) \
+		  .set_trans(Tween.TRANS_SINE)
+
+	# Height arc, drawn on the sprite offset only so the shadow stays on the deck
+	var peak: float = -8.0
+	if is_bomb:
+		peak = -52.0
+	elif not is_grubber:
+		peak = -30.0
+
+	var arc := create_tween()
+	arc.tween_property(ball.sprite, "position:y", peak, flight * 0.45) \
+	   .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	arc.tween_property(ball.sprite, "position:y", 0.0, flight * 0.55) \
+	   .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+
+	await tw.finished
+	ball.sprite.position.y = 0.0
+	ball.give_to(catcher)
+
+
+# Knock-on: the ball spills forward off the runner and your nearest man takes it.
+func _animate_spill_beat(beat: Dictionary) -> void:
+	var spot := Vector2(beat["ball_x"], beat["ball_y"])
+	var atk: Array = get_tree().get_nodes_in_group("attackers")
+	var ball: Ball = get_ball()
+	if ball == null or atk.is_empty():
+		return
+
+	ball.carrier = null
+	ball.in_flight = false
+	ball.is_loose = false
+	ball.visible = true
+
+	var loose := Vector2(
+		clamp(spot.x - 30.0, Field.FIELD_LEFT + 14.0, Field.FIELD_RIGHT - 14.0),
+		clamp(spot.y + randf_range(-20.0, 20.0), 50.0, Field.FIELD_BOTTOM - 50.0)
+	)
+
+	var catcher = atk[0]
+	var best: float = INF
+	for a in atk:
+		a.is_user_controlled = false
+		var dd: float = a.global_position.distance_to(loose)
+		if dd < best:
+			best = dd
+			catcher = a
+
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(ball, "global_position", loose, 0.45) \
+	  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(catcher, "global_position", loose, 0.8) \
+	  .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+	var arc := create_tween()
+	arc.tween_property(ball.sprite, "position:y", -10.0, 0.2).set_trans(Tween.TRANS_SINE)
+	arc.tween_property(ball.sprite, "position:y", 0.0, 0.25).set_trans(Tween.TRANS_SINE)
+
+	await tw.finished
+	ball.sprite.position.y = 0.0
+	ball.give_to(catcher)
 
 
 func _finish_opposition_set() -> void:

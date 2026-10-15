@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://oxf06m3gjiap"
-path="res://.godot/imported/player_phs_run_1.png-08730fd9d90faa671cd6d0760afefecf.ctex"
+uid="uid://bonmbinv43u8q"
+path="res://.godot/imported/stadium.png-aa28a05429a40ea68273d66e97380066.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/players/player_phs_run_1.png"
-dest_files=["res://.godot/imported/player_phs_run_1.png-08730fd9d90faa671cd6d0760afefecf.ctex"]
+source_file="res://art/field/stadium.png"
+dest_files=["res://.godot/imported/stadium.png-aa28a05429a40ea68273d66e97380066.ctex"]
 
 [params]
 
